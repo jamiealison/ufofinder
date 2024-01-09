@@ -69,7 +69,7 @@ cv2.namedWindow("Image", cv2.WINDOW_NORMAL)
 cv2.imshow("Image", image)
 cv2.waitKey()
 
-output_path = wd+"an_output_image.jpg"  # Replace with the desired output path and file name
+output_path = wd+"an_output_image.png"  # Replace with the desired output path and file name
 
 #convert boolean array to binary image to display
 mask_disp=(mask * 255).astype(np.uint8)
@@ -77,5 +77,5 @@ cv2.namedWindow("Image", cv2.WINDOW_NORMAL)
 cv2.imshow("Image", mask_disp)
 cv2.waitKey()
 
-# Save the image as JPEG
+# Save the image as png
 cv2.imwrite(output_path, mask_disp)
