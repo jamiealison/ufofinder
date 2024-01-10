@@ -5,7 +5,22 @@ Created on Tue Jan  9 16:27:34 2024
 @author: au694732
 """
 
-import numpy as np, miniball, math, cv2, scipy.ndimage, os
+import numpy as np, miniball, math, cv2, scipy.ndimage, os, statistics
+
+def line_ends_from_angle(x_centre, y_centre, radius, bearing_deg):
+    
+    # Convert bearing from degrees to radians
+    bearing_rad = math.radians(bearing_deg)
+
+    # Calculate new latitude
+    #change + to minus for both x and y because in images the positive y coordinate runs "south" so to speak
+    y_new = y_centre - radius * math.cos(bearing_rad)
+
+    # Calculate new longitude
+    x_new = x_centre - radius * math.sin(bearing_rad) / math.cos(math.radians(y_centre))
+
+    return x_centre, y_centre, np.round(x_new).astype(int), np.round(y_new).astype(int)
+
 
 def bresenham_line(x0, y0, x1, y1):
     points = []
@@ -42,9 +57,6 @@ def pixels_on_line(image, line):
 
     return intersection_pixels
 
-# Define a line (start and end points)
-line = (990, 950, 990, 0)
-
 wd="O:/Tech_ECOS-OWF-Screening/Fugle-flagermus-havpattedyr/BIRDS/Ship_BasedSurveys/VerticalRadar/ScreenDumps/2023 08 10-16/"
 
 # List all files in the directory ending with ".jpg"
@@ -55,26 +67,49 @@ file=files[0]
 
 # Load the image
 image = cv2.imread(wd+file)
+image_masked = cv2.imread(wd+file)
 mask = cv2.imread(wd+"an_output_image.png")
 
-image[mask[:,:,0]==0]=0
+image_masked[mask[:,:,0]==0]=0
+ 
+rednesses=[]
+#angles=[90]
+angles=[x / 2.0 for x in range(0, 721)]
+   
+for angle in angles:
 
-# Display the image
+    # Define a line (start and end points)
+    line=line_ends_from_angle(990,950,929,angle)
+    
+    # Get pixels that intersect the line
+    intersecting_pixels = pixels_on_line(image_masked, line)
+    
+    # Convert the list of coordinates to a NumPy array for indexing
+    coordinates_array = np.array(intersecting_pixels)
+    
+    # Extract x and y coordinates separately
+    x_coords, y_coords = coordinates_array[:, 0], coordinates_array[:, 1]
+    
+    # # Modify pixel values using array indexing to highlight them
+    # # For example, setting the pixels to white (255, 255, 255)
+    # image[y_coords, x_coords] = [255, 255, 255]
+    
+    redness=statistics.mean(image_masked[y_coords, x_coords,2])
+    
+    if(redness>1):
+        #plot the line using cv2 functionality
+        color = (0, 0, int(redness))  # Green color (BGR format)
+        # for item in color:
+        #     print(f"Item: {item}, Type: {type(item)}")
+        thickness = 2  # Thickness of the circle outline
+        cv2.line(image, line[0:2], line[2:4], color, thickness) 
+        
+    rednesses=rednesses+[redness]
+
+# Visualize the result
 cv2.namedWindow("Image", cv2.WINDOW_NORMAL)
 cv2.imshow("Image", image)
 cv2.waitKey()
 
 # Save the image as JPEG
 cv2.imwrite(wd+"an_output_image_masked.png", image)
-
-# Get pixels that intersect the line
-intersecting_pixels = pixels_on_line(image, line)
-
-color = (0, 255, 0)  # Green color (BGR format)
-thickness = 2  # Thickness of the circle outline
-cv2.line(image, line[0:2], line[2:4], color, thickness) 
-
-# Visualize the result
-cv2.namedWindow("Image", cv2.WINDOW_NORMAL)
-cv2.imshow("Image", image)
-cv2.waitKey()

@@ -20,7 +20,7 @@ wd="O:/Tech_ECOS-OWF-Screening/Fugle-flagermus-havpattedyr/BIRDS/Ship_BasedSurve
 # List all files in the directory ending with ".jpg"
 jpg_files = [f for f in os.listdir(wd) if f.lower().endswith(".jpg")]
 
-files=jpg_files[0:100]
+files=jpg_files[0:1000]
 
 for file in files:
 
