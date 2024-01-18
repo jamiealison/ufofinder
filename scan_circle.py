@@ -20,17 +20,22 @@ wd="O:/Tech_ECOS-OWF-Screening/Fugle-flagermus-havpattedyr/BIRDS/Ship_BasedSurve
 # List all files in the directory ending with ".jpg"
 jpg_files = [f for f in os.listdir(wd) if f.lower().endswith(".jpg")]
 
-files=jpg_files[0:1000]
+files=jpg_files[1:100]
 
 for file in files:
 
     # Load the image
     image = cv2.imread(wd+file)
     
-    this_mask = np.all((image >= [100,0,0]) & (image <= [120,5,5]), axis=-1)
+    #eventually this probably needs to involve rolling through the images and using
+    #an evolving background model?
+    #it could be stored as a transparency layer on each image?
+    this_blue = np.all((image >= [100,0,0]) & (image <= [120,1,1]), axis=-1)
+    this_green = np.all((image >= [100,100,30]) & (image <= [150,150,70]), axis=-1)
     if file==files[0]:
-        mask = np.all((image >= [100,0,0]) & (image <= [120,5,5]), axis=-1)
-    mask = mask | this_mask
+        mask = np.copy(this_blue)
+    mask = mask | this_blue
+    mask = mask & np.logical_not(this_green)
     
     
 # b=image[:, :, 0]
