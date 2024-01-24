@@ -78,9 +78,6 @@ files=sorted(jpg_files)
 #file=files[1224]
 file=files[0]
 #file=files[1]
-#there remains an issue with artefacts close to the centre. These may be best
-#excluded by actually including the central blob in detection, and then eliminating
-#based on size.
 #file=files[6]
 print(file)
 
@@ -185,25 +182,7 @@ valid=np.transpose(np.where(mask[:,:,0] > 0))
 valid_r=np.percentile(image_masked[valid[:,0],valid[:,1],2], 95)
 print(valid_r)
 
-# #r_above_b=np.transpose(np.where(image_masked[:,:,0] < image_masked[:,:,2]))
-# #r_above_b=image_masked[:,:,2] > image_masked[:,:,0]
-# r_above_0=image_masked[:,:,2] > 0
-# #r_ab_b_ab_0=np.logical_and(r_above_b,b_above_0)
-# r_div_rb=horizon_mask[:,:,0].astype(float)
-# r_div_rb[:]=0
-# image_r_fl=image_masked[:,:,2].astype(float)
-# image_b_fl=image_masked[:,:,1].astype(float)
-# #r_div_rb[np.logical_not(r_above_0)]=0
-# const=20
-# r_div_rb[r_above_0]=255*image_r_fl[r_above_0]/(image_r_fl[r_above_0]+image_b_fl[r_above_0]+const)
-# print(str(np.max(r_div_rb)))
-# print(str(np.max(image_masked[:,:,2])))
-# print(str(np.min(r_div_rb)))
-# # Save the image as JPEG
-# # Normalize the float array to the range [0, 255]
-# r_div_rb = r_div_rb.astype(np.uint8)
-# r_div_rb = image_masked[:,:,2]
-
+#legacy code for blurring
 # r_div_rb_sm=scipy.ndimage.uniform_filter(r_div_rb,size=3)
 
 # Convert the image from BGR to HSV color space
@@ -235,25 +214,30 @@ h_th=np.logical_and(h>=target_h-interval,h<=target_h+interval).astype(int) * 255
 cv2.imwrite(wd+"an_output_image_r_th.png", h_th)
 
 image_ufos,n_ufos=skimage.measure.label(h_th,return_num=True)
-print(n_ufos)
+print("UFOs before filtering: {}".format(n_ufos))
 
 ufos_dict=skimage.measure.regionprops_table(image_ufos, properties=('label','centroid','bbox','area','axis_major_length','axis_minor_length'))
 ufos=pandas.DataFrame(ufos_dict)
-print(ufos)
 
-ufos.to_csv(wd+'output_file.csv', index=False) 
+dx = abs(x_centre - ufos["centroid-1"])
+dy = abs(y_centre - ufos["centroid-0"])
+d = np.sqrt(dx**2+(dy/warp)**2)
+#note the distance is in strange units - "WARPED PIXELS"
+ufos=ufos.assign(distance=d)
 
+#filters
+#best do removal of close-by detections first
+out=d>50
+ufos=ufos[out]
 ufos=ufos[ufos["area"]>=5]
+ufos=ufos[ufos["area"]<=600]
 ufos=ufos[ufos["axis_major_length"]/ufos["axis_minor_length"]<=5]
 ufos=ufos[ufos["axis_major_length"]>0]
 ufos=ufos[ufos["axis_minor_length"]>0]
-#ufos=ufos[ufos["area"]<=600]
+
+ufos.to_csv(wd+'output_file.csv', index=False) 
 
 for ufo in range(0,len(ufos)):
     cv2.circle(image, (int(ufos["centroid-1"].iloc[ufo]),int(ufos["centroid-0"].iloc[ufo])), 10, (255,255,255), 3)
-
-cv2.namedWindow("Image", cv2.WINDOW_NORMAL)
-cv2.imshow("Image", image)
-cv2.waitKey()
 
 cv2.imwrite(wd+"an_output_image_ufos_circled.png", image)
