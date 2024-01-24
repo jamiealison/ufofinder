@@ -10,6 +10,7 @@ import numpy as np, miniball, math, cv2, scipy.ndimage, os, statistics,skimage.m
 x_centre=990
 y_centre=950
 radius=929
+warp=0.989724175229854
 
 def line_ends_from_angle(x_centre, y_centre, radius, angle):
     
@@ -50,6 +51,12 @@ def bresenham_line(x0, y0, x1, y1):
             y0 += sy
 
     return np.array(points)
+
+def point_in_circle(x1,y1,x_centre,y_centre,radius,warp):
+    dx = abs(x_centre - x1)
+    dy = abs(y_centre - y1)
+    d = math.sqrt(dx**2+(dy/warp)**2)
+    return(d<radius)
 
 def pixels_on_line(image, line):
     line_pixels = bresenham_line(*line)
@@ -106,8 +113,8 @@ for angle in angles:
     # Modify pixel values using array indexing to highlight them
     # For example, setting the pixels to white (255, 255, 255)
     # using this to check for symmetry of the bresenham line function from chatgpt
-    if(angle in [0]):
-        image[y_coords, x_coords] = [255, 255, 255]
+    # if(angle in [0]):
+    #     image[y_coords, x_coords] = [255, 255, 255]
 
     redness=np.percentile(image_masked[y_coords, x_coords,2],40)
     
@@ -151,7 +158,8 @@ for pixel in l_pixels+r_pixels:
     x, y = pixel
     y1=0
     while y1<=y:
-        above_pixels.append((x, y1))
+        if point_in_circle(x,y1,x_centre,y_centre,radius,warp):
+            above_pixels.append((x, y1))
         y1+=1
 
 # Convert the list of coordinates to a NumPy array for indexing
@@ -163,11 +171,8 @@ x_coords, y_coords = coordinates_array[:, 0], coordinates_array[:, 1]
 horizon_mask=np.copy(mask)
 horizon_mask[:]=0
 horizon_mask[y_coords, x_coords] = [255]
-
-mask=scipy.ndimage.binary_dilation(mask,iterations=1)
-mask=mask&horizon_mask
-
-image_masked[mask[:,:,0]==0,:]=0
+image_masked = np.copy(image)
+image_masked[horizon_mask[:,:,0]==0,:]=0
 
 # Save the image as JPEG
 cv2.imwrite(wd+"an_output_image_masked.png", image_masked)
@@ -180,19 +185,56 @@ valid=np.transpose(np.where(mask[:,:,0] > 0))
 valid_r=np.percentile(image_masked[valid[:,0],valid[:,1],2], 95)
 print(valid_r)
 
-image_r=image_masked[:, :, 2]
-# Save the image as JPEG
-cv2.imwrite(wd+"an_output_image_r.png", image_r)
+# #r_above_b=np.transpose(np.where(image_masked[:,:,0] < image_masked[:,:,2]))
+# #r_above_b=image_masked[:,:,2] > image_masked[:,:,0]
+# r_above_0=image_masked[:,:,2] > 0
+# #r_ab_b_ab_0=np.logical_and(r_above_b,b_above_0)
+# r_div_rb=horizon_mask[:,:,0].astype(float)
+# r_div_rb[:]=0
+# image_r_fl=image_masked[:,:,2].astype(float)
+# image_b_fl=image_masked[:,:,1].astype(float)
+# #r_div_rb[np.logical_not(r_above_0)]=0
+# const=20
+# r_div_rb[r_above_0]=255*image_r_fl[r_above_0]/(image_r_fl[r_above_0]+image_b_fl[r_above_0]+const)
+# print(str(np.max(r_div_rb)))
+# print(str(np.max(image_masked[:,:,2])))
+# print(str(np.min(r_div_rb)))
+# # Save the image as JPEG
+# # Normalize the float array to the range [0, 255]
+# r_div_rb = r_div_rb.astype(np.uint8)
+# r_div_rb = image_masked[:,:,2]
 
-image_r_sm=scipy.ndimage.uniform_filter(image_r,size=3)
+# r_div_rb_sm=scipy.ndimage.uniform_filter(r_div_rb,size=3)
 
-cv2.imwrite(wd+"an_output_image_r_sm.png", image_r_sm)
+# Convert the image from BGR to HSV color space
+hls_image = cv2.cvtColor(image_masked, cv2.COLOR_BGR2HLS)
+print(np.max(hls_image[:, :, 0]))
 
-ret, image_r_th=cv2.threshold(image_r_sm,100,255,cv2.THRESH_BINARY)
-cv2.imwrite(wd+"an_output_image_r_th.png", image_r_th)
+h = hls_image[:, :, 0]
+s = hls_image[:, :, 2]
+l = hls_image[:, :, 1]
+l_x = 255-(2*np.abs(127.5-l.astype(float)))
+l_x = l_x.astype(np.uint8)
+s_cone=np.minimum(s,l_x)
 
-image_ufos,n_ufos=skimage.measure.label(image_r_th,return_num=True)
-cv2.imwrite(wd+"an_output_image_ufos.png", image_ufos+200)
+cv2.imwrite(wd+"an_output_image_r.png", h)
+
+min_s=60
+target_h=30
+interval=5
+
+cv2.imwrite(wd+"an_output_image_s_cone.png", s_cone)
+
+s_below_min=s_cone<min_s
+h[s_below_min]=0
+
+# h_sm=scipy.ndimage.uniform_filter(h,size=3)
+# cv2.imwrite(wd+"an_output_image_r_sm.png", h_sm)
+
+h_th=np.logical_and(h>=target_h-interval,h<=target_h+interval).astype(int) * 255
+cv2.imwrite(wd+"an_output_image_r_th.png", h_th)
+
+image_ufos,n_ufos=skimage.measure.label(h_th,return_num=True)
 print(n_ufos)
 
 ufos_dict=skimage.measure.regionprops_table(image_ufos, properties=('label','centroid','bbox','area','axis_major_length','axis_minor_length'))
@@ -201,7 +243,11 @@ print(ufos)
 
 ufos.to_csv(wd+'output_file.csv', index=False) 
 
-ufos=ufos[ufos["area"]>3]
+ufos=ufos[ufos["area"]>=5]
+ufos=ufos[ufos["axis_major_length"]/ufos["axis_minor_length"]<=5]
+ufos=ufos[ufos["axis_major_length"]>0]
+ufos=ufos[ufos["axis_minor_length"]>0]
+#ufos=ufos[ufos["area"]<=600]
 
 for ufo in range(0,len(ufos)):
     cv2.circle(image, (int(ufos["centroid-1"].iloc[ufo]),int(ufos["centroid-0"].iloc[ufo])), 10, (255,255,255), 3)

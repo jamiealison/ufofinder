@@ -20,7 +20,7 @@ wd="O:/Tech_ECOS-OWF-Screening/Fugle-flagermus-havpattedyr/BIRDS/Ship_BasedSurve
 # List all files in the directory ending with ".jpg"
 jpg_files = [f for f in os.listdir(wd) if f.lower().endswith(".jpg")]
 
-files=jpg_files[1:100]
+files=jpg_files[1:2]
 
 for file in files:
 
@@ -55,7 +55,12 @@ cv2.waitKey()
 
 S = np.argwhere(mask_edge)
 print(len(S))
-
+xs = [t[0] for t in S]
+ys = [t[1] for t in S]
+print("Max x {}, min x {}.".format(max(xs),min(xs)))
+print("Max y {}, min y {}.".format(max(ys),min(ys)))
+warp=(max(xs)-min(xs))/(max(ys)-min(ys))
+print(warp)
 
 np.random.seed(1)
 #S = np.random.randn(100, 2)
