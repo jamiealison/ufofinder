@@ -11,10 +11,16 @@ x_centre=990
 y_centre=950
 radius=929
 warp=0.989724175229854
-horizon_thresh=10
+horizon_thresh=20
+horizon_buff=2
 min_s=60
 target_h=30
 interval=5
+
+#folder="2023 08 10-16"
+folder="Radar Grabs 2023 10 07 - 11"
+indir="O:/Tech_ECOS-OWF-Screening/Fugle-flagermus-havpattedyr/BIRDS/Ship_BasedSurveys/VerticalRadar/ScreenDumps/"+folder+"/"
+outdir="O:/Tech_ECOS-OWF-Screening/Fugle-flagermus-havpattedyr/BIRDS/Ship_BasedSurveys/VerticalRadar/Predictions/"+folder+"/"
 
 def line_ends_from_angle(x_centre, y_centre, radius, angle,warp):
     
@@ -73,9 +79,6 @@ def pixels_on_line(image, line):
 
     return intersection_pixels
 
-folder="2023 08 10-16"
-indir="O:/Tech_ECOS-OWF-Screening/Fugle-flagermus-havpattedyr/BIRDS/Ship_BasedSurveys/VerticalRadar/ScreenDumps/"+folder+"/"
-outdir="O:/Tech_ECOS-OWF-Screening/Fugle-flagermus-havpattedyr/BIRDS/Ship_BasedSurveys/VerticalRadar/Predictions/"+folder+"/"
 
 if not os.path.exists(outdir):
     os.makedirs(outdir)
@@ -84,167 +87,183 @@ if not os.path.exists(outdir):
 jpg_files = [f for f in os.listdir(indir) if f.lower().endswith(".jpg")]
 
 files=sorted(jpg_files)
+
 #file=files[1224]
-file=files[0]
+#file=files[0]
 #file=files[1]
 #file=files[6]
-print(file)
+egFile=31
 
-# Load the image
-image = cv2.imread(indir+file)
-image_masked = np.copy(image)
-image_angles = np.copy(image)
+for file in files[:101]:
 
-
-# Convert the image from BGR to HSV color space
-hls_image = cv2.cvtColor(image_masked, cv2.COLOR_BGR2HLS)
-#print(np.max(hls_image[:, :, 0]))
-
-h = hls_image[:, :, 0]
-s = hls_image[:, :, 2]
-l = hls_image[:, :, 1]
-l_x = 255-(2*np.abs(127.5-l.astype(float)))
-l_x = l_x.astype(np.uint8)
-s_cone=np.minimum(s,l_x)
-
-#cv2.imwrite(outdir+"an_output_image_hue.png", h)
-
-#cv2.imwrite(outdir+"an_output_image_s_cone.png", s_cone)
-
-s_below_min=s_cone<min_s
-h[s_below_min]=0
-
-# h_sm=scipy.ndimage.uniform_filter(h,size=3)
-# cv2.imwrite(wd+"an_output_image_r_sm.png", h_sm)
-
-h_th=np.logical_and(h>=target_h-interval,h<=target_h+interval).astype(int) * 255
-cv2.imwrite(outdir+"an_output_image_yellow.png", h_th)
- 
-yellownesses=[]
-#angles=[90]
-angles=[x / 2.0 for x in range(0, 720)]
-   
-for angle in angles:
-
-    # Define a line (start and end points)
-    line=line_ends_from_angle(x_centre, y_centre, radius, angle, warp)
+    print(file)
     
-    # Get pixels that intersect the line
-    intersecting_pixels = pixels_on_line(h_th, line)
+    # Load the image
+    image = cv2.imread(indir+file)
+    image_masked = np.copy(image)
+    image_angles = np.copy(image)
+    
+    
+    # Convert the image from BGR to HSV color space
+    hls_image = cv2.cvtColor(image_masked, cv2.COLOR_BGR2HLS)
+    #print(np.max(hls_image[:, :, 0]))
+    
+    h = hls_image[:, :, 0]
+    s = hls_image[:, :, 2]
+    l = hls_image[:, :, 1]
+    l_x = 255-(2*np.abs(127.5-l.astype(float)))
+    l_x = l_x.astype(np.uint8)
+    s_cone=np.minimum(s,l_x)
+    
+    #cv2.imwrite(outdir+"an_output_image_hue.png", h)
+    
+    #cv2.imwrite(outdir+"an_output_image_s_cone.png", s_cone)
+    
+    s_below_min=s_cone<min_s
+    h[s_below_min]=0
+    
+    # h_sm=scipy.ndimage.uniform_filter(h,size=3)
+    # cv2.imwrite(wd+"an_output_image_r_sm.png", h_sm)
+    
+    h_th=np.logical_and(h>=target_h-interval,h<=target_h+interval).astype(int) * 255
+    if file==files[egFile]:
+        cv2.imwrite(outdir+"an_output_image_relevant.png", h_th)
+     
+    yellownesses=[]
+    #angles=[90]
+    angles=[x / 2.0 for x in range(0, 720)]
+       
+    for angle in angles:
+    
+        # Define a line (start and end points)
+        line=line_ends_from_angle(x_centre, y_centre, radius, angle, warp)
+        
+        # Get pixels that intersect the line
+        intersecting_pixels = pixels_on_line(h_th, line)
+        
+        # Convert the list of coordinates to a NumPy array for indexing
+        coordinates_array = np.array(intersecting_pixels)
+        
+        # Extract x and y coordinates separately
+        x_coords, y_coords = coordinates_array[:, 0], coordinates_array[:, 1]
+        
+        # Modify pixel values using array indexing to highlight them
+        # For example, setting the pixels to white (255, 255, 255)
+        # using this to check for symmetry of the bresenham line function from chatgpt
+        # if(angle in [0]):
+        #     image[y_coords, x_coords] = [255, 255, 255]
+    
+        #redness=np.percentile(image_masked[y_coords, x_coords,2],40)
+        yellowness=np.mean(h_th[y_coords, x_coords])
+        
+        # below is to plot the horizon lines
+        if(yellowness>horizon_thresh):
+            #plot the line using cv2 functionality
+            color = (0, 0, int(yellowness))  # Green color (BGR format)
+            # for item in color:
+            #     print(f"Item: {item}, Type: {type(item)}")
+            thickness = 2  # Thickness of the circle outline
+            cv2.line(image_angles, line[0:2], line[2:4], color, thickness) 
+            
+        yellownesses=yellownesses+[np.round(yellowness)]
+    
+    horizon_r = angles[0:360][np.argmax(yellownesses[0:360])]
+    horizon_l = angles[360:720][np.argmax(yellownesses[360:720])]
+    print(horizon_r)
+    print(horizon_l)
+    
+    yellownesses=np.array(yellownesses).astype(int)
+    print(yellownesses)
+    
+    horizon_r_clean=angles[np.where(yellownesses>horizon_thresh)[0][0] if np.any(yellownesses>horizon_thresh) else None]-horizon_buff
+    horizon_l_clean=angles[np.where(yellownesses>horizon_thresh)[0][-1] if np.any(yellownesses>horizon_thresh) else None]+horizon_buff
+    print(horizon_r_clean)
+    print(horizon_l_clean)
+    #here we use an artificial horizon to extract bad weather conditions
+    
+    adj_horizon_r=horizon_r_clean
+    adj_horizon_l=horizon_l_clean
+    # adj_horizon_r=70
+    # adj_horizon_l=290
+    
+    r_line=line_ends_from_angle(x_centre, y_centre, radius, adj_horizon_r,warp)
+    r_pixels=pixels_on_line(image_masked, r_line)
+    l_line=line_ends_from_angle(x_centre, y_centre, radius, adj_horizon_l,warp)
+    l_pixels=pixels_on_line(image_masked, l_line)
+    above_pixels=[]
+    
+    for pixel in l_pixels+r_pixels:
+        x, y = pixel
+        y1=0
+        while y1<=y:
+            if point_in_circle(x,y1,x_centre,y_centre,radius,warp):
+                above_pixels.append((x, y1))
+            y1+=1
     
     # Convert the list of coordinates to a NumPy array for indexing
-    coordinates_array = np.array(intersecting_pixels)
+    coordinates_array = np.array(above_pixels)
     
     # Extract x and y coordinates separately
     x_coords, y_coords = coordinates_array[:, 0], coordinates_array[:, 1]
     
-    # Modify pixel values using array indexing to highlight them
-    # For example, setting the pixels to white (255, 255, 255)
-    # using this to check for symmetry of the bresenham line function from chatgpt
-    # if(angle in [0]):
-    #     image[y_coords, x_coords] = [255, 255, 255]
-
-    #redness=np.percentile(image_masked[y_coords, x_coords,2],40)
-    yellowness=np.mean(h_th[y_coords, x_coords])
+    horizon_mask=np.copy(image)
+    horizon_mask[:]=0
+    horizon_mask[y_coords, x_coords] = [255]
+    image_masked=np.copy(image)
+    image_masked[horizon_mask[:,:,0]==0,:]=0
     
-    # below is to plot the horizon lines
-    if(yellowness>horizon_thresh):
-        #plot the line using cv2 functionality
-        color = (0, 0, int(yellowness))  # Green color (BGR format)
-        # for item in color:
-        #     print(f"Item: {item}, Type: {type(item)}")
-        thickness = 2  # Thickness of the circle outline
-        cv2.line(image_angles, line[0:2], line[2:4], color, thickness) 
-        
-    yellownesses=yellownesses+[np.round(yellowness)]
+    h_th[horizon_mask[:,:,0]==0,]=0
+    
+    if file==files[egFile]:
+        cv2.imwrite(outdir+"an_output_image_segments.png", h_th)
+        # Save the image as JPEG
+        cv2.imwrite(outdir+"an_output_image_masked.png", image_masked)
+        # Save the image as JPEG
+        cv2.imwrite(outdir+"an_output_image_horizons.png", image_angles)
+    
+    valid=np.transpose(np.where(horizon_mask[:,:,0] > 0))
+    
+    #valid_r=np.mean(image_masked[:,:,2])
+    valid_r=np.percentile(image_masked[valid[:,0],valid[:,1],2], 95)
+    #print(valid_r)
+    
+    
+    image_ufos,n_ufos=skimage.measure.label(h_th,return_num=True)
+    print("UFOs before filtering: {}".format(n_ufos))
+    
+    ufos_dict=skimage.measure.regionprops_table(image_ufos, properties=('label','centroid','bbox','area','axis_major_length','axis_minor_length'))
+    ufos=pandas.DataFrame(ufos_dict)
+    
+    dx = abs(x_centre - ufos["centroid-1"])
+    dy = abs(y_centre - ufos["centroid-0"])
+    d = np.sqrt(dx**2+(dy/warp)**2)
+    #note the distance is in strange units - "WARPED PIXELS"
+    ufos=ufos.assign(distance=d)
+    
+    #filters
+    #best do removal of close-by detections first
+    out=d>50
+    ufos=ufos[out]
+    ufos["file"]=file
+    ufos["horizon_l"]=horizon_l
+    ufos["horizon_r"]=horizon_r
+    ufos=ufos[ufos["area"]>=5]
+    ufos=ufos[ufos["area"]<=600]
+    ufos=ufos[ufos["axis_major_length"]/ufos["axis_minor_length"]<=5]
+    ufos=ufos[ufos["axis_major_length"]>0]
+    ufos=ufos[ufos["axis_minor_length"]>0]
+    
+    for ufo in range(0,len(ufos)):
+        cv2.circle(image, (int(ufos["centroid-1"].iloc[ufo]),int(ufos["centroid-0"].iloc[ufo])), 10, (255,255,255), 3)
+    
+    #print(image.shape)
+    image_with_alpha = cv2.merge([image, horizon_mask[:,:,0]])
+    #print(image_with_alpha.shape)
+    cv2.imwrite(outdir+file.replace("jpg", "png"), image_with_alpha)
+    
+    if file==files[0]:
+        all_ufos=ufos.copy()
+    else:
+        all_ufos=pandas.concat([all_ufos, ufos], ignore_index=True)
 
-horizon_r = angles[0:360][np.argmax(yellownesses[0:360])]
-horizon_l = angles[360:720][np.argmax(yellownesses[360:720])]
-print(horizon_r)
-print(horizon_l)
-
-yellownesses=np.array(yellownesses).astype(int)
-print(yellownesses)
-
-horizon_r_clean=angles[np.where(yellownesses>horizon_thresh)[0][0] if np.any(yellownesses>horizon_thresh) else None]-1
-horizon_l_clean=angles[np.where(yellownesses>horizon_thresh)[0][-1] if np.any(yellownesses>horizon_thresh) else None]+1
-print(horizon_r_clean)
-print(horizon_l_clean)
-#here we use an artificial horizon to extract bad weather conditions
-
-adj_horizon_r=horizon_r_clean
-adj_horizon_l=horizon_l_clean
-# adj_horizon_r=70
-# adj_horizon_l=290
-
-r_line=line_ends_from_angle(x_centre, y_centre, radius, adj_horizon_r,warp)
-r_pixels=pixels_on_line(image_masked, r_line)
-l_line=line_ends_from_angle(x_centre, y_centre, radius, adj_horizon_l,warp)
-l_pixels=pixels_on_line(image_masked, l_line)
-above_pixels=[]
-
-for pixel in l_pixels+r_pixels:
-    x, y = pixel
-    y1=0
-    while y1<=y:
-        if point_in_circle(x,y1,x_centre,y_centre,radius,warp):
-            above_pixels.append((x, y1))
-        y1+=1
-
-# Convert the list of coordinates to a NumPy array for indexing
-coordinates_array = np.array(above_pixels)
-
-# Extract x and y coordinates separately
-x_coords, y_coords = coordinates_array[:, 0], coordinates_array[:, 1]
-
-horizon_mask=np.copy(image)
-horizon_mask[:]=0
-horizon_mask[y_coords, x_coords] = [255]
-image_masked=np.copy(image)
-image_masked[horizon_mask[:,:,0]==0,:]=0
-
-h_th[horizon_mask[:,:,0]==0,]=0
-cv2.imwrite(outdir+"an_output_image_segments.png", h_th)
-
-
-# Save the image as JPEG
-cv2.imwrite(outdir+"an_output_image_masked.png", image_masked)
-# Save the image as JPEG
-cv2.imwrite(outdir+"an_output_image_horizons.png", image_angles)
-
-valid=np.transpose(np.where(horizon_mask[:,:,0] > 0))
-
-#valid_r=np.mean(image_masked[:,:,2])
-valid_r=np.percentile(image_masked[valid[:,0],valid[:,1],2], 95)
-#print(valid_r)
-
-
-image_ufos,n_ufos=skimage.measure.label(h_th,return_num=True)
-print("UFOs before filtering: {}".format(n_ufos))
-
-ufos_dict=skimage.measure.regionprops_table(image_ufos, properties=('label','centroid','bbox','area','axis_major_length','axis_minor_length'))
-ufos=pandas.DataFrame(ufos_dict)
-
-dx = abs(x_centre - ufos["centroid-1"])
-dy = abs(y_centre - ufos["centroid-0"])
-d = np.sqrt(dx**2+(dy/warp)**2)
-#note the distance is in strange units - "WARPED PIXELS"
-ufos=ufos.assign(distance=d)
-
-#filters
-#best do removal of close-by detections first
-out=d>50
-ufos=ufos[out]
-ufos=ufos[ufos["area"]>=5]
-ufos=ufos[ufos["area"]<=600]
-ufos=ufos[ufos["axis_major_length"]/ufos["axis_minor_length"]<=5]
-ufos=ufos[ufos["axis_major_length"]>0]
-ufos=ufos[ufos["axis_minor_length"]>0]
-ufos["file"]=file
-
-for ufo in range(0,len(ufos)):
-    cv2.circle(image, (int(ufos["centroid-1"].iloc[ufo]),int(ufos["centroid-0"].iloc[ufo])), 10, (255,255,255), 3)
-
-cv2.imwrite(outdir+file, image)
-
-ufos.to_csv(outdir+'detected_ufos.csv', index=False) 
+all_ufos.to_csv(outdir+'detected_ufos.csv', index=False) 
