@@ -11,8 +11,12 @@ x_centre=990
 y_centre=950
 radius=929
 warp=0.989724175229854
+horizon_thresh=10
+min_s=60
+target_h=30
+interval=5
 
-def line_ends_from_angle(x_centre, y_centre, radius, angle):
+def line_ends_from_angle(x_centre, y_centre, radius, angle,warp):
     
     # Convert bearing from degrees to radians
     bearing_rad = math.radians(angle)
@@ -20,7 +24,7 @@ def line_ends_from_angle(x_centre, y_centre, radius, angle):
     # #change + to minus for both x and y because in images the positive y coordinate runs "south" so to speak
     
     # Calculate new latitude
-    y_new = y_centre - radius * math.cos(bearing_rad)
+    y_new = y_centre - (radius * math.cos(bearing_rad))*warp
 
     # Calculate new longitude
     x_new = x_centre + radius * math.sin(bearing_rad)
@@ -69,10 +73,15 @@ def pixels_on_line(image, line):
 
     return intersection_pixels
 
-wd="O:/Tech_ECOS-OWF-Screening/Fugle-flagermus-havpattedyr/BIRDS/Ship_BasedSurveys/VerticalRadar/ScreenDumps/2023 08 10-16/"
+folder="2023 08 10-16"
+indir="O:/Tech_ECOS-OWF-Screening/Fugle-flagermus-havpattedyr/BIRDS/Ship_BasedSurveys/VerticalRadar/ScreenDumps/"+folder+"/"
+outdir="O:/Tech_ECOS-OWF-Screening/Fugle-flagermus-havpattedyr/BIRDS/Ship_BasedSurveys/VerticalRadar/Predictions/"+folder+"/"
+
+if not os.path.exists(outdir):
+    os.makedirs(outdir)
 
 # List all files in the directory ending with ".jpg"
-jpg_files = [f for f in os.listdir(wd) if f.lower().endswith(".jpg")]
+jpg_files = [f for f in os.listdir(indir) if f.lower().endswith(".jpg")]
 
 files=sorted(jpg_files)
 #file=files[1224]
@@ -82,24 +91,46 @@ file=files[0]
 print(file)
 
 # Load the image
-image = cv2.imread(wd+file)
+image = cv2.imread(indir+file)
 image_masked = np.copy(image)
 image_angles = np.copy(image)
-mask = cv2.imread(wd+"an_output_image.png")
 
-image_masked[mask[:,:,0]==0]=0
+
+# Convert the image from BGR to HSV color space
+hls_image = cv2.cvtColor(image_masked, cv2.COLOR_BGR2HLS)
+#print(np.max(hls_image[:, :, 0]))
+
+h = hls_image[:, :, 0]
+s = hls_image[:, :, 2]
+l = hls_image[:, :, 1]
+l_x = 255-(2*np.abs(127.5-l.astype(float)))
+l_x = l_x.astype(np.uint8)
+s_cone=np.minimum(s,l_x)
+
+#cv2.imwrite(outdir+"an_output_image_hue.png", h)
+
+#cv2.imwrite(outdir+"an_output_image_s_cone.png", s_cone)
+
+s_below_min=s_cone<min_s
+h[s_below_min]=0
+
+# h_sm=scipy.ndimage.uniform_filter(h,size=3)
+# cv2.imwrite(wd+"an_output_image_r_sm.png", h_sm)
+
+h_th=np.logical_and(h>=target_h-interval,h<=target_h+interval).astype(int) * 255
+cv2.imwrite(outdir+"an_output_image_yellow.png", h_th)
  
-rednesses=[]
+yellownesses=[]
 #angles=[90]
 angles=[x / 2.0 for x in range(0, 720)]
    
 for angle in angles:
 
     # Define a line (start and end points)
-    line=line_ends_from_angle(x_centre, y_centre, radius,angle)
+    line=line_ends_from_angle(x_centre, y_centre, radius, angle, warp)
     
     # Get pixels that intersect the line
-    intersecting_pixels = pixels_on_line(image_masked, line)
+    intersecting_pixels = pixels_on_line(h_th, line)
     
     # Convert the list of coordinates to a NumPy array for indexing
     coordinates_array = np.array(intersecting_pixels)
@@ -113,29 +144,30 @@ for angle in angles:
     # if(angle in [0]):
     #     image[y_coords, x_coords] = [255, 255, 255]
 
-    redness=np.percentile(image_masked[y_coords, x_coords,2],40)
+    #redness=np.percentile(image_masked[y_coords, x_coords,2],40)
+    yellowness=np.mean(h_th[y_coords, x_coords])
     
     # below is to plot the horizon lines
-    if(redness>=1):
+    if(yellowness>horizon_thresh):
         #plot the line using cv2 functionality
-        color = (0, 0, int(redness))  # Green color (BGR format)
+        color = (0, 0, int(yellowness))  # Green color (BGR format)
         # for item in color:
         #     print(f"Item: {item}, Type: {type(item)}")
         thickness = 2  # Thickness of the circle outline
         cv2.line(image_angles, line[0:2], line[2:4], color, thickness) 
         
-    rednesses=rednesses+[np.round(redness)]
+    yellownesses=yellownesses+[np.round(yellowness)]
 
-
-horizon_r = angles[0:360][np.argmax(rednesses[0:360])]
-horizon_l = angles[360:720][np.argmax(rednesses[360:720])]
+horizon_r = angles[0:360][np.argmax(yellownesses[0:360])]
+horizon_l = angles[360:720][np.argmax(yellownesses[360:720])]
 print(horizon_r)
 print(horizon_l)
 
-print(rednesses)
+yellownesses=np.array(yellownesses).astype(int)
+print(yellownesses)
 
-horizon_r_clean=angles[np.nonzero(rednesses)[0][0] if np.any(rednesses) else None]-1
-horizon_l_clean=angles[np.nonzero(rednesses)[0][-1] if np.any(rednesses) else None]+1
+horizon_r_clean=angles[np.where(yellownesses>horizon_thresh)[0][0] if np.any(yellownesses>horizon_thresh) else None]-1
+horizon_l_clean=angles[np.where(yellownesses>horizon_thresh)[0][-1] if np.any(yellownesses>horizon_thresh) else None]+1
 print(horizon_r_clean)
 print(horizon_l_clean)
 #here we use an artificial horizon to extract bad weather conditions
@@ -145,9 +177,9 @@ adj_horizon_l=horizon_l_clean
 # adj_horizon_r=70
 # adj_horizon_l=290
 
-r_line=line_ends_from_angle(x_centre, y_centre, radius, adj_horizon_r)
+r_line=line_ends_from_angle(x_centre, y_centre, radius, adj_horizon_r,warp)
 r_pixels=pixels_on_line(image_masked, r_line)
-l_line=line_ends_from_angle(x_centre, y_centre, radius, adj_horizon_l)
+l_line=line_ends_from_angle(x_centre, y_centre, radius, adj_horizon_l,warp)
 l_pixels=pixels_on_line(image_masked, l_line)
 above_pixels=[]
 
@@ -165,53 +197,27 @@ coordinates_array = np.array(above_pixels)
 # Extract x and y coordinates separately
 x_coords, y_coords = coordinates_array[:, 0], coordinates_array[:, 1]
 
-horizon_mask=np.copy(mask)
+horizon_mask=np.copy(image)
 horizon_mask[:]=0
 horizon_mask[y_coords, x_coords] = [255]
-image_masked = np.copy(image)
+image_masked=np.copy(image)
 image_masked[horizon_mask[:,:,0]==0,:]=0
 
-# Save the image as JPEG
-cv2.imwrite(wd+"an_output_image_masked.png", image_masked)
-# Save the image as JPEG
-cv2.imwrite(wd+"an_output_image_horizons.png", image_angles)
+h_th[horizon_mask[:,:,0]==0,]=0
+cv2.imwrite(outdir+"an_output_image_segments.png", h_th)
 
-valid=np.transpose(np.where(mask[:,:,0] > 0))
+
+# Save the image as JPEG
+cv2.imwrite(outdir+"an_output_image_masked.png", image_masked)
+# Save the image as JPEG
+cv2.imwrite(outdir+"an_output_image_horizons.png", image_angles)
+
+valid=np.transpose(np.where(horizon_mask[:,:,0] > 0))
 
 #valid_r=np.mean(image_masked[:,:,2])
 valid_r=np.percentile(image_masked[valid[:,0],valid[:,1],2], 95)
-print(valid_r)
+#print(valid_r)
 
-#legacy code for blurring
-# r_div_rb_sm=scipy.ndimage.uniform_filter(r_div_rb,size=3)
-
-# Convert the image from BGR to HSV color space
-hls_image = cv2.cvtColor(image_masked, cv2.COLOR_BGR2HLS)
-print(np.max(hls_image[:, :, 0]))
-
-h = hls_image[:, :, 0]
-s = hls_image[:, :, 2]
-l = hls_image[:, :, 1]
-l_x = 255-(2*np.abs(127.5-l.astype(float)))
-l_x = l_x.astype(np.uint8)
-s_cone=np.minimum(s,l_x)
-
-cv2.imwrite(wd+"an_output_image_r.png", h)
-
-min_s=60
-target_h=30
-interval=5
-
-cv2.imwrite(wd+"an_output_image_s_cone.png", s_cone)
-
-s_below_min=s_cone<min_s
-h[s_below_min]=0
-
-# h_sm=scipy.ndimage.uniform_filter(h,size=3)
-# cv2.imwrite(wd+"an_output_image_r_sm.png", h_sm)
-
-h_th=np.logical_and(h>=target_h-interval,h<=target_h+interval).astype(int) * 255
-cv2.imwrite(wd+"an_output_image_r_th.png", h_th)
 
 image_ufos,n_ufos=skimage.measure.label(h_th,return_num=True)
 print("UFOs before filtering: {}".format(n_ufos))
@@ -234,10 +240,11 @@ ufos=ufos[ufos["area"]<=600]
 ufos=ufos[ufos["axis_major_length"]/ufos["axis_minor_length"]<=5]
 ufos=ufos[ufos["axis_major_length"]>0]
 ufos=ufos[ufos["axis_minor_length"]>0]
-
-ufos.to_csv(wd+'output_file.csv', index=False) 
+ufos["file"]=file
 
 for ufo in range(0,len(ufos)):
     cv2.circle(image, (int(ufos["centroid-1"].iloc[ufo]),int(ufos["centroid-0"].iloc[ufo])), 10, (255,255,255), 3)
 
-cv2.imwrite(wd+"an_output_image_ufos_circled.png", image)
+cv2.imwrite(outdir+file, image)
+
+ufos.to_csv(outdir+'detected_ufos.csv', index=False) 
