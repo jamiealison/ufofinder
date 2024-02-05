@@ -7,16 +7,25 @@ Created on Wed Jan 24 11:04:56 2024
 
 import numpy as np, miniball, math, cv2, scipy.ndimage,scipy.spatial, os, statistics,skimage.measure,pandas as pd, json
 
-wd="O:/Tech_ECOS-OWF-Screening/Fugle-flagermus-havpattedyr/BIRDS/Ship_BasedSurveys/VerticalRadar/ScreenDumps/2023 08 10-16/"
+#folder="2023 08 10-16"
+folder="Radar Grabs 2023 10 07 - 11"
+indir="O:/Tech_ECOS-OWF-Screening/Fugle-flagermus-havpattedyr/BIRDS/Ship_BasedSurveys/VerticalRadar/ScreenDumps/"+folder+"/"
+outdir="O:/Tech_ECOS-OWF-Screening/Fugle-flagermus-havpattedyr/BIRDS/Ship_BasedSurveys/VerticalRadar/Predictions/"+folder+"/"
 
-pred=pd.read_csv(wd+"output_file.csv")
+# List all files in the directory ending with ".jpg"
+jpg_files = [f for f in os.listdir(indir) if f.lower().endswith(".jpg")]
 
+files=sorted(jpg_files)
+file=files[31]
+
+pred=pd.read_csv(outdir+"detected_ufos.csv")
+pred=pred[pred["file"]==file]
 print(pred)
 
 obs=pd.read_csv(r"O:\Tech_ECOS-OWF-Screening\Fugle-flagermus-havpattedyr\BIRDS\Ship_BasedSurveys\VerticalRadar\Annotations\RDN\project_20231007_final.csv")
 #obs = obs.drop('name', axis=1)
 
-obs=obs[obs["filename"]=="CAP_20231007_194441_285.jpg"]
+obs=obs[obs["filename"]==file]
 print(obs["region_shape_attributes"])
 print(obs.columns)
 
@@ -58,7 +67,7 @@ obs["match_dist"]=distances
 obs=obs.sort_values(by="match_dist",ascending=True)
 obs["match"]=obs["match_dist"]<15
 obs.loc[obs.duplicated(subset=[x for x in obs.columns if x != "region_shape_attributes"]),"match"]=False
-obs.to_csv(wd+"output_file_obs.csv")
+obs.to_csv(outdir+"output_file_obs.csv")
 
 # Query nearest neighbors for each point in pred
 distances, indices = kdtree_set1.query(p_xy)
@@ -68,7 +77,7 @@ pred["match_dist"]=distances
 pred=pred.sort_values(by="match_dist",ascending=True)
 pred["match"]=pred["match_dist"]<15
 pred.loc[pred.duplicated(),"match"]=False
-pred.to_csv(wd+"output_file_pred.csv")
+pred.to_csv(outdir+"output_file_pred.csv")
 
 tp=sum(pred["match"])
 fp=sum(np.logical_not(pred["match"]))
@@ -80,21 +89,17 @@ rec=tp/(tp+fn)
 f1=2*(pre*rec)/(pre+rec)
 print(pre,rec,f1)
 
-# List all files in the directory ending with ".jpg"
-jpg_files = [f for f in os.listdir(wd) if f.lower().endswith(".jpg")]
 
-files=sorted(jpg_files)
-file=files[0]
 # Load the image
-image = cv2.imread(wd+file)
+image = cv2.imread(indir+file)
 
 for ufo in range(0,len(obs)):
     cv2.circle(image, (int(obs["cx"].iloc[ufo]),int(obs["cy"].iloc[ufo])), 10, (255,255,255), 3)
 
-cv2.imwrite(wd+"an_output_image_ufos_observed.png", image)
+cv2.imwrite(outdir+"ufos_observed.png", image)
 
 for ufo in range(0,len(pred)):
     if pred.loc[ufo,"match"]:
         cv2.circle(image, (int(pred["centroid-1"].iloc[ufo]),int(pred["centroid-0"].iloc[ufo])), 10, (0,255,0), 3)
     
-cv2.imwrite(wd+"an_output_image_ufos_detected.png", image)
+cv2.imwrite(outdir+"ufos_detected.png", image)
