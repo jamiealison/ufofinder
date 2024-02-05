@@ -15,17 +15,22 @@ As conda cannot install those packages.
 
 import numpy as np, miniball, math, cv2, scipy.ndimage, os
 
-wd="O:/Tech_ECOS-OWF-Screening/Fugle-flagermus-havpattedyr/BIRDS/Ship_BasedSurveys/VerticalRadar/ScreenDumps/2023 08 10-16/"
+#folder="2023 08 10-16"
+folder="Radar Grabs 2023 10 07 - 11"
+indir="O:/Tech_ECOS-OWF-Screening/Fugle-flagermus-havpattedyr/BIRDS/Ship_BasedSurveys/VerticalRadar/ScreenDumps/"+folder+"/"
+outdir="O:/Tech_ECOS-OWF-Screening/Fugle-flagermus-havpattedyr/BIRDS/Ship_BasedSurveys/VerticalRadar/Predictions/"+folder+"/"
 
 # List all files in the directory ending with ".jpg"
-jpg_files = [f for f in os.listdir(wd) if f.lower().endswith(".jpg")]
-
-files=jpg_files[1:2]
+jpg_files = [f for f in os.listdir(indir) if f.lower().endswith(".jpg")]
+#print(jpg_files)
+files=sorted(jpg_files)
+files=[files[31]]
 
 for file in files:
-
+    
+    print(file)
     # Load the image
-    image = cv2.imread(wd+file)
+    image = cv2.imread(indir+file)
     
     #eventually this probably needs to involve rolling through the images and using
     #an evolving background model?
@@ -79,7 +84,7 @@ cv2.namedWindow("Image", cv2.WINDOW_NORMAL)
 cv2.imshow("Image", image)
 cv2.waitKey()
 
-output_path = wd+"an_output_image.png"  # Replace with the desired output path and file name
+output_path = outdir+"a_scan_circle.png"  # Replace with the desired output path and file name
 
 #convert boolean array to binary image to display
 mask_disp=(mask * 255).astype(np.uint8)
@@ -88,4 +93,4 @@ cv2.imshow("Image", mask_disp)
 cv2.waitKey()
 
 # Save the image as png
-cv2.imwrite(output_path, mask_disp)
+cv2.imwrite(output_path, image)
