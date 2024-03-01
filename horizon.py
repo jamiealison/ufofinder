@@ -11,6 +11,7 @@ x_centre=990
 y_centre=950
 radius=929
 warp=0.989724175229854
+radius2=int(radius*warp)
 horizon_thresh=20
 horizon_buff=2
 min_s=60
@@ -79,7 +80,6 @@ def pixels_on_line(image, line):
 
     return intersection_pixels
 
-
 if not os.path.exists(outdir):
     os.makedirs(outdir)
 
@@ -94,7 +94,7 @@ files=sorted(jpg_files)
 #file=files[6]
 egFile=31
 
-for file in files[:101]:
+for file in files[:1]:
 
     print(file)
     
@@ -200,19 +200,26 @@ for file in files[:101]:
                 above_pixels.append((x, y1))
             y1+=1
     
+    
     # Convert the list of coordinates to a NumPy array for indexing
     coordinates_array = np.array(above_pixels)
     
     # Extract x and y coordinates separately
     x_coords, y_coords = coordinates_array[:, 0], coordinates_array[:, 1]
     
-    horizon_mask=np.copy(image)
-    horizon_mask[:]=0
+    horizon_mask=np.zeros_like(image)
     horizon_mask[y_coords, x_coords] = [255]
-    image_masked=np.copy(image)
-    image_masked[horizon_mask[:,:,0]==0,:]=0
     
-    h_th[horizon_mask[:,:,0]==0,]=0
+    circle_mask = np.zeros_like(image)
+    # cv2.circle(circle_mask, (x_centre, y_centre), radius, (255, 255, 255), thickness=-1)
+    cv2.ellipse(circle_mask, (x_centre, y_centre), (radius,radius2), 0, 0, 360, (255, 255, 255), thickness=-1)
+    
+    image_masked=np.copy(image)
+    image_masked[circle_mask[:,:,0]==0,:]=0
+    image_masked[circle_mask[:,:,0]==0,:]=0
+    
+    #important - we remove the areas outside the from the hue mask, but not the areas below the horizon
+    h_th[circle_mask[:,:,0]==0,]=0
     
     if file==files[egFile]:
         cv2.imwrite(outdir+"an_output_image_segments.png", h_th)
@@ -247,6 +254,7 @@ for file in files[:101]:
     ufos["file"]=file
     ufos["horizon_l"]=horizon_l
     ufos["horizon_r"]=horizon_r
+    ufos["above_horizon"]=horizon_mask[ufos["centroid-0"].astype(int), ufos["centroid-1"].astype(int)] == 255
     ufos=ufos[ufos["area"]>=5]
     ufos=ufos[ufos["area"]<=600]
     ufos=ufos[ufos["axis_major_length"]/ufos["axis_minor_length"]<=5]
