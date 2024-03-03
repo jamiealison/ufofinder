@@ -94,7 +94,7 @@ files=sorted(jpg_files)
 #file=files[6]
 egFile=31
 
-for file in files[:1]:
+for file in files[:101]:
 
     print(file)
     
@@ -254,12 +254,16 @@ for file in files[:1]:
     ufos["file"]=file
     ufos["horizon_l"]=horizon_l
     ufos["horizon_r"]=horizon_r
-    ufos["above_horizon"]=horizon_mask[ufos["centroid-0"].astype(int), ufos["centroid-1"].astype(int)] == 255
+    pix_x=ufos["centroid-0"].astype(int).tolist()
+    pix_y=ufos["centroid-1"].astype(int).tolist()
+    print(pix_x)
+    ufos["above_horizon"]=horizon_mask[pix_x, pix_y,0] == 255
     ufos=ufos[ufos["area"]>=5]
     ufos=ufos[ufos["area"]<=600]
     ufos=ufos[ufos["axis_major_length"]/ufos["axis_minor_length"]<=5]
     ufos=ufos[ufos["axis_major_length"]>0]
     ufos=ufos[ufos["axis_minor_length"]>0]
+    ufos=ufos[ufos["above_horizon"]==True]
     
     for ufo in range(0,len(ufos)):
         cv2.circle(image, (int(ufos["centroid-1"].iloc[ufo]),int(ufos["centroid-0"].iloc[ufo])), 10, (255,255,255), 3)
