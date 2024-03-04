@@ -18,10 +18,10 @@ min_s=60
 target_h=30
 interval=5
 
-draw=False
+draw=True
 
-folder="2023 08 10-16"
-#folder="Radar Grabs 2023 10 07 - 11"
+#folder="2023 08 10-16"
+folder="Radar Grabs 2023 10 07 - 11"
 indir="O:/Tech_ECOS-OWF-Screening/Fugle-flagermus-havpattedyr/BIRDS/Ship_BasedSurveys/VerticalRadar/ScreenDumps/"+folder+"/"
 outdir="O:/Tech_ECOS-OWF-Screening/Fugle-flagermus-havpattedyr/BIRDS/Ship_BasedSurveys/VerticalRadar/Predictions/"+folder+"/"
 
@@ -82,6 +82,31 @@ def pixels_on_line(image, line):
 
     return intersection_pixels
 
+def is_point_above_horizon(point, x_centre, y_centre, horizon_r, horizon_l):
+    x, y = point
+    x-=x_centre
+    y=y_centre-y
+    #note added reciprocal to math.tan to account for 0 being up
+    if x<0:
+        angle=horizon_l
+        #taking the negative of the slope on the left side
+        slope = -1/math.tan(math.radians(angle))  # Convert angle to radians and calculate slope
+    else:
+        angle=horizon_r
+        slope = 1/math.tan(math.radians(angle))  # Convert angle to radians and calculate slope
+        
+    line_value = slope * abs(x)
+    
+    return y > line_value
+
+# Example usage:
+horizon_r = 82 # Replace with the angle of your line
+horizon_l = 274.5
+point_to_check = [1883, 842] # Replace with the coordinates of your point
+print(1/math.tan(math.radians(horizon_r)))
+print(-1/math.tan(math.radians(horizon_l)))
+result = is_point_above_horizon(point_to_check, x_centre, y_centre, horizon_r, horizon_l)
+print(result)
 
 # Record start time
 start_time = time.time()
@@ -98,11 +123,13 @@ files=sorted(jpg_files)
 #file=files[0]
 #file=files[1]
 #file=files[6]
-egFile=31
+#egFile=31
+egFile=1
+files=files[15:17]
 
 print("1: initial setup:   "+(str(time.time()-start_time)))
 
-for file in files[:1]:
+for file in files[:]:
 
     print(file)
     
@@ -242,6 +269,7 @@ for file in files[:1]:
         cv2.imwrite(outdir+"an_output_image_masked.png", image_masked)
         # Save the image as JPEG
         cv2.imwrite(outdir+"an_output_image_horizons.png", image_angles)
+        cv2.imwrite(outdir+"an_output_image_horizon_mask.png", horizon_mask)
     
     valid=np.transpose(np.where(horizon_mask[:,:,0] > 0))
     
@@ -269,15 +297,19 @@ for file in files[:1]:
     ufos["file"]=file
     ufos["horizon_l"]=horizon_l
     ufos["horizon_r"]=horizon_r
-    pix_x=ufos["centroid-0"].astype(int).tolist()
-    pix_y=ufos["centroid-1"].astype(int).tolist()
-    ufos["above_horizon"]=horizon_mask[pix_x, pix_y,0] == 255
+    pix_x=ufos["centroid-1"].astype(int).tolist()
+    pix_y=ufos["centroid-0"].astype(int).tolist()
+    ufos["above_horizon"]=horizon_mask[pix_y, pix_x,0] == 255
+    # Example usage:
+    angle_of_line = 30  # Replace with the angle of your line
+    point_to_check = (3, 5)  # Replace with the coordinates of your point
+    ufos['above_line'] = ufos[["centroid-1","centroid-0"]].apply(lambda row: is_point_above_horizon(row, x_centre, y_centre,adj_horizon_r,adj_horizon_l), axis=1)
     ufos=ufos[ufos["area"]>=5]
     ufos=ufos[ufos["area"]<=600]
     ufos=ufos[ufos["axis_major_length"]/ufos["axis_minor_length"]<=5]
     ufos=ufos[ufos["axis_major_length"]>0]
     ufos=ufos[ufos["axis_minor_length"]>0]
-    ufos=ufos[ufos["above_horizon"]==True]
+    #ufos=ufos[ufos["above_horizon"]==True]
     
     print("7: ufos filtered   "+(str(time.time()-start_time)))
     
@@ -288,9 +320,10 @@ for file in files[:1]:
         #print(image.shape)
         image_with_alpha = cv2.merge([image, horizon_mask[:,:,0]])
         #print(image_with_alpha.shape)
-        cv2.imwrite(outdir+file.replace("jpg", "png"), image_with_alpha)
+        #cv2.imwrite(outdir+file.replace("jpg", "png"), image_with_alpha)
+        cv2.imwrite(outdir+file.replace("jpg", "png"), image)
         
-    print("8: ufos drawn and written to png   "+(str(time.time()-start_time)))
+    print("8: ufos drawn and written to png (if draw = True)   "+(str(time.time()-start_time)))
     
     if file==files[0]:
         all_ufos=ufos.copy()
