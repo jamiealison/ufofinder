@@ -5,7 +5,7 @@ Created on Tue Jan  9 16:27:34 2024
 @author: au694732
 """
 
-import numpy as np, miniball, math, cv2, scipy.ndimage, os, statistics,skimage.measure,pandas
+import numpy as np, miniball, math, cv2, scipy.ndimage, os, statistics,skimage.measure,pandas,time
 
 x_centre=990
 y_centre=950
@@ -18,8 +18,10 @@ min_s=60
 target_h=30
 interval=5
 
-#folder="2023 08 10-16"
-folder="Radar Grabs 2023 10 07 - 11"
+draw=False
+
+folder="2023 08 10-16"
+#folder="Radar Grabs 2023 10 07 - 11"
 indir="O:/Tech_ECOS-OWF-Screening/Fugle-flagermus-havpattedyr/BIRDS/Ship_BasedSurveys/VerticalRadar/ScreenDumps/"+folder+"/"
 outdir="O:/Tech_ECOS-OWF-Screening/Fugle-flagermus-havpattedyr/BIRDS/Ship_BasedSurveys/VerticalRadar/Predictions/"+folder+"/"
 
@@ -80,6 +82,10 @@ def pixels_on_line(image, line):
 
     return intersection_pixels
 
+
+# Record start time
+start_time = time.time()
+
 if not os.path.exists(outdir):
     os.makedirs(outdir)
 
@@ -94,7 +100,9 @@ files=sorted(jpg_files)
 #file=files[6]
 egFile=31
 
-for file in files[:101]:
+print("1: initial setup:   "+(str(time.time()-start_time)))
+
+for file in files[:1]:
 
     print(file)
     
@@ -132,7 +140,9 @@ for file in files[:101]:
     yellownesses=[]
     #angles=[90]
     angles=[x / 2.0 for x in range(0, 720)]
-       
+    
+    print("2: image loaded and colorspace coverted   "+(str(time.time()-start_time)))
+    
     for angle in angles:
     
         # Define a line (start and end points)
@@ -167,13 +177,15 @@ for file in files[:101]:
             
         yellownesses=yellownesses+[np.round(yellowness)]
     
+    print("3: horizon lines detected   "+(str(time.time()-start_time)))
+    
     horizon_r = angles[0:360][np.argmax(yellownesses[0:360])]
     horizon_l = angles[360:720][np.argmax(yellownesses[360:720])]
     print(horizon_r)
     print(horizon_l)
     
     yellownesses=np.array(yellownesses).astype(int)
-    print(yellownesses)
+    #print(yellownesses)
     
     horizon_r_clean=angles[np.where(yellownesses>horizon_thresh)[0][0] if np.any(yellownesses>horizon_thresh) else None]-horizon_buff
     horizon_l_clean=angles[np.where(yellownesses>horizon_thresh)[0][-1] if np.any(yellownesses>horizon_thresh) else None]+horizon_buff
@@ -200,7 +212,6 @@ for file in files[:101]:
                 above_pixels.append((x, y1))
             y1+=1
     
-    
     # Convert the list of coordinates to a NumPy array for indexing
     coordinates_array = np.array(above_pixels)
     
@@ -210,6 +221,8 @@ for file in files[:101]:
     horizon_mask=np.zeros_like(image)
     horizon_mask[y_coords, x_coords] = [255]
     
+    print("4: horizon mask generated   "+(str(time.time()-start_time)))
+    
     circle_mask = np.zeros_like(image)
     # cv2.circle(circle_mask, (x_centre, y_centre), radius, (255, 255, 255), thickness=-1)
     cv2.ellipse(circle_mask, (x_centre, y_centre), (radius,radius2), 0, 0, 360, (255, 255, 255), thickness=-1)
@@ -217,6 +230,8 @@ for file in files[:101]:
     image_masked=np.copy(image)
     image_masked[circle_mask[:,:,0]==0,:]=0
     image_masked[circle_mask[:,:,0]==0,:]=0
+    
+    print("5: circle mask generated   "+(str(time.time()-start_time)))
     
     #important - we remove the areas outside the from the hue mask, but not the areas below the horizon
     h_th[circle_mask[:,:,0]==0,]=0
@@ -236,7 +251,7 @@ for file in files[:101]:
     
     
     image_ufos,n_ufos=skimage.measure.label(h_th,return_num=True)
-    print("UFOs before filtering: {}".format(n_ufos))
+    print("6: UFOs detected before filtering: {},     {}".format(n_ufos,str(time.time()-start_time)))
     
     ufos_dict=skimage.measure.regionprops_table(image_ufos, properties=('label','centroid','bbox','area','axis_major_length','axis_minor_length'))
     ufos=pandas.DataFrame(ufos_dict)
@@ -256,7 +271,6 @@ for file in files[:101]:
     ufos["horizon_r"]=horizon_r
     pix_x=ufos["centroid-0"].astype(int).tolist()
     pix_y=ufos["centroid-1"].astype(int).tolist()
-    print(pix_x)
     ufos["above_horizon"]=horizon_mask[pix_x, pix_y,0] == 255
     ufos=ufos[ufos["area"]>=5]
     ufos=ufos[ufos["area"]<=600]
@@ -265,13 +279,18 @@ for file in files[:101]:
     ufos=ufos[ufos["axis_minor_length"]>0]
     ufos=ufos[ufos["above_horizon"]==True]
     
-    for ufo in range(0,len(ufos)):
-        cv2.circle(image, (int(ufos["centroid-1"].iloc[ufo]),int(ufos["centroid-0"].iloc[ufo])), 10, (255,255,255), 3)
+    print("7: ufos filtered   "+(str(time.time()-start_time)))
     
-    #print(image.shape)
-    image_with_alpha = cv2.merge([image, horizon_mask[:,:,0]])
-    #print(image_with_alpha.shape)
-    cv2.imwrite(outdir+file.replace("jpg", "png"), image_with_alpha)
+    if draw:
+        for ufo in range(0,len(ufos)):
+            cv2.circle(image, (int(ufos["centroid-1"].iloc[ufo]),int(ufos["centroid-0"].iloc[ufo])), 10, (255,255,255), 3)
+        
+        #print(image.shape)
+        image_with_alpha = cv2.merge([image, horizon_mask[:,:,0]])
+        #print(image_with_alpha.shape)
+        cv2.imwrite(outdir+file.replace("jpg", "png"), image_with_alpha)
+        
+    print("8: ufos drawn and written to png   "+(str(time.time()-start_time)))
     
     if file==files[0]:
         all_ufos=ufos.copy()
@@ -279,3 +298,5 @@ for file in files[:101]:
         all_ufos=pandas.concat([all_ufos, ufos], ignore_index=True)
 
 all_ufos.to_csv(outdir+'detected_ufos.csv', index=False) 
+
+print("9: ufos written to csv   "+(str(time.time()-start_time)))
