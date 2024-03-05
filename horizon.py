@@ -5,7 +5,7 @@ Created on Tue Jan  9 16:27:34 2024
 @author: au694732
 """
 
-import numpy as np, miniball, math, cv2, scipy.ndimage, os, statistics,skimage.measure,pandas,time
+import numpy as np, math, cv2, os, skimage.measure,pandas,time
 
 x_centre=990
 y_centre=950
@@ -13,7 +13,7 @@ radius=929
 warp=0.989724175229854
 radius2=int(radius*warp)
 horizon_thresh=20
-radial_artefact_thresh=10
+radial_artefact_thresh=20
 horizon_buff=2
 min_s=60
 target_h=30
@@ -132,7 +132,7 @@ egFile=31
 
 print("1: initial setup:   "+(str(time.time()-start_time)))
 
-for file in files[:101]:
+for file in files[:1]:
 
     print(file)
     
@@ -190,7 +190,7 @@ for file in files[:101]:
         yellowness=np.mean(h_th[y_coords, x_coords])
         
         # below is to plot the horizon lines
-        if(yellowness>horizon_thresh):
+        if(yellowness>horizon_thresh and file==files[egFile]):
             #plot the line using cv2 functionality
             color = (0, 0, int(yellowness))  # Green color (BGR format)
             # for item in color:

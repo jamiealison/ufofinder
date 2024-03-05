@@ -93,13 +93,12 @@ for file in files[:101]:
     # fn=sum(np.logical_not(this_obs["match"]))
     # print(tp,fp,fn)
     
-    
-    if file==files[0]:
-        all_pred=this_pred.copy()
-        all_obs=this_obs.copy()
-    else:
+    try:
         all_pred=pd.concat([all_pred, this_pred], ignore_index=True)
         all_obs=pd.concat([all_obs, this_obs], ignore_index=True)
+    except NameError:
+        all_pred=this_pred.copy()
+        all_obs=this_obs.copy()
     
     if file==files[31]:
 
