@@ -17,10 +17,14 @@ hst=20
 rst=20
 hbf=2
 mis=60
+mia=5
+maa=600
+mid=50
+lwr=5
 hue=30
 hi=5
 
-def predict_ufos(folder,hue,hi,mis,mia,maa,mid,lwr,hst,hbf,x_centre,y_centre,radius,warp,draw=False,egFile=0):
+def predict_ufos(folder,hue,hi,mis,mia,maa,mid,lwr,hst,hbf,x_centre,y_centre,radius,warp,lim=101,draw=False,egFile=0):
 
     indir="O:/Tech_ECOS-OWF-Screening/Fugle-flagermus-havpattedyr/BIRDS/Ship_BasedSurveys/VerticalRadar/ScreenDumps/"+folder+"/"
     outdir="O:/Tech_ECOS-OWF-Screening/Fugle-flagermus-havpattedyr/BIRDS/Ship_BasedSurveys/VerticalRadar/Predictions/"+folder+"/"
@@ -40,7 +44,10 @@ def predict_ufos(folder,hue,hi,mis,mia,maa,mid,lwr,hst,hbf,x_centre,y_centre,rad
     
     print("1: initial setup:   "+(str(time.time()-start_time)))
     
-    for file in files[:1]:
+    if len(files)<lim:
+        raise ValueError("lim is higher then the number of jpgs in the directory")
+    
+    for file in files[:lim]:
     
         print(file)
         
@@ -180,7 +187,7 @@ def predict_ufos(folder,hue,hi,mis,mia,maa,mid,lwr,hst,hbf,x_centre,y_centre,rad
         
         #filters
         #best do removal of close-by detections first
-        out=d>50
+        out=d>mid
         ufos=ufos[out]
         ufos["file"]=file
         ufos["horizon_l"]=horizon_l
@@ -194,9 +201,9 @@ def predict_ufos(folder,hue,hi,mis,mia,maa,mid,lwr,hst,hbf,x_centre,y_centre,rad
         ufos["radial_artefact"]=ufos["angle"].apply(lambda row: angle_in_artefacts(row, artefact_horizons))
         #ensure distinction between raidal artefacts and below horizon
         ufos.loc[ufos["above_horizon"]==False,["radial_artefact"]]=False
-        ufos=ufos[ufos["area"]>=5]
-        ufos=ufos[ufos["area"]<=600]
-        ufos=ufos[ufos["axis_major_length"]/ufos["axis_minor_length"]<=5]
+        ufos=ufos[ufos["area"]>=mia]
+        ufos=ufos[ufos["area"]<=maa]
+        ufos=ufos[ufos["axis_major_length"]/ufos["axis_minor_length"]<=lwr]
         ufos=ufos[ufos["axis_major_length"]>0]
         ufos=ufos[ufos["axis_minor_length"]>0]
         ufos=ufos[ufos["above_horizon"]==True]
@@ -307,3 +314,5 @@ def angle_in_artefacts(angle,artefacts):
     abs_diffs=[abs(x) for x in diffs]
     small_diffs=[x<0.5 for x in abs_diffs]
     return any(small_diffs)
+
+predict_ufos(folder,hue,hi,mis,mia,maa,mid,lwr,hst,hbf,x_centre,y_centre,radius,warp,draw=False,egFile=0)
