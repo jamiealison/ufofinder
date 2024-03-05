@@ -102,15 +102,6 @@ def angle_of_point(point, x_centre, y_centre):
     
     return angle_deg
 
-# Example usage:
-horizon_r = 82 # Replace with the angle of your line
-horizon_l = 274.5
-point_to_check = [1883, 842] # Replace with the coordinates of your point
-print(1/math.tan(math.radians(horizon_r)))
-print(-1/math.tan(math.radians(horizon_l)))
-result = is_point_above_horizon(point_to_check, x_centre, y_centre, horizon_r, horizon_l)
-print(result)
-
 # Record start time
 start_time = time.time()
 
