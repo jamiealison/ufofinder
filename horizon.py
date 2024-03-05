@@ -13,6 +13,7 @@ radius=929
 warp=0.989724175229854
 radius2=int(radius*warp)
 horizon_thresh=20
+radial_artefact_thresh=10
 horizon_buff=2
 min_s=60
 target_h=30
@@ -20,8 +21,8 @@ interval=5
 
 draw=False
 
-folder="2023 08 10-16"
-#folder="Radar Grabs 2023 10 07 - 11"
+#folder="2023 08 10-16"
+folder="Radar Grabs 2023 10 07 - 11"
 indir="O:/Tech_ECOS-OWF-Screening/Fugle-flagermus-havpattedyr/BIRDS/Ship_BasedSurveys/VerticalRadar/ScreenDumps/"+folder+"/"
 outdir="O:/Tech_ECOS-OWF-Screening/Fugle-flagermus-havpattedyr/BIRDS/Ship_BasedSurveys/VerticalRadar/Predictions/"+folder+"/"
 
@@ -96,11 +97,19 @@ def is_point_above_horizon(point, x_centre, y_centre, horizon_r, horizon_l):
 def angle_of_point(point, x_centre, y_centre):
     x, y = point
     # Calculate the angle in radians using atan2
-    angle_rad = math.atan2(y - y_centre, x - x_centre)
+    angle_rad = math.atan2(y_centre-y, x_centre-x)
     # Convert the angle to degrees and shift it so that 0 degrees is north
     angle_deg = (math.degrees(angle_rad)-90) % 360
     
     return angle_deg
+
+def angle_in_artefacts(angle,artefacts):
+    diffs=[angle - artefact for artefact in artefacts]
+    abs_diffs=[abs(x) for x in diffs]
+    small_diffs=[x<0.5 for x in abs_diffs]
+    return any(small_diffs)
+
+print(angle_in_artefacts(20,[19,21]))
 
 # Record start time
 start_time = time.time()
@@ -117,13 +126,13 @@ files=sorted(jpg_files)
 #file=files[0]
 #file=files[1]
 #file=files[6]
-#egFile=31
-egFile=16
+egFile=31
+#egFile=0
 #files=files[15:17]
 
 print("1: initial setup:   "+(str(time.time()-start_time)))
 
-for file in files[:17]:
+for file in files[:101]:
 
     print(file)
     
@@ -178,13 +187,6 @@ for file in files[:17]:
         # Extract x and y coordinates separately
         x_coords, y_coords = coordinates_array[:, 0], coordinates_array[:, 1]
         
-        # Modify pixel values using array indexing to highlight them
-        # For example, setting the pixels to white (255, 255, 255)
-        # using this to check for symmetry of the bresenham line function from chatgpt
-        # if(angle in [0]):
-        #     image[y_coords, x_coords] = [255, 255, 255]
-    
-        #redness=np.percentile(image_masked[y_coords, x_coords,2],40)
         yellowness=np.mean(h_th[y_coords, x_coords])
         
         # below is to plot the horizon lines
@@ -207,6 +209,11 @@ for file in files[:17]:
     
     yellownesses=np.array(yellownesses).astype(int)
     #print(yellownesses)
+    
+    horizons = pandas.DataFrame({'angle': angles, 'strength': yellownesses})
+    artefact_horizons=horizons.loc[horizons['strength']>radial_artefact_thresh,['angle']]
+    artefact_horizons=artefact_horizons['angle'].tolist()
+    print(artefact_horizons)
     
     horizon_r_clean=angles[np.where(yellownesses>horizon_thresh)[0][0] if np.any(yellownesses>horizon_thresh) else None]-horizon_buff
     horizon_l_clean=angles[np.where(yellownesses>horizon_thresh)[0][-1] if np.any(yellownesses>horizon_thresh) else None]+horizon_buff
@@ -251,7 +258,7 @@ for file in files[:17]:
     valid_r=np.percentile(image_masked[valid[:,0],valid[:,1],2], 95)
     #print(valid_r)
     
-    
+
     image_ufos,n_ufos=skimage.measure.label(h_th,return_num=True)
     print("6: UFOs detected before filtering: {},     {}".format(n_ufos,str(time.time()-start_time)))
     
@@ -274,18 +281,19 @@ for file in files[:17]:
     pix_x=ufos["centroid-1"].astype(int).tolist()
     pix_y=ufos["centroid-0"].astype(int).tolist()
     ufos["above_horizon"]=horizon_mask[pix_y, pix_x,0] == 255
-    # Example usage:
-    angle_of_line = 30  # Replace with the angle of your line
-    point_to_check = (3, 5)  # Replace with the coordinates of your point
     #below an alternative way to calculate whether ufos are above horizon, but horizon mask is now so fast that it's not needed
     #ufos['above_line'] = ufos[["centroid-1","centroid-0"]].apply(lambda row: is_point_above_horizon(row, x_centre, y_centre,adj_horizon_r,adj_horizon_l), axis=1)
     ufos['angle'] = ufos[["centroid-1","centroid-0"]].apply(lambda row: angle_of_point(row, x_centre, y_centre), axis=1)
+    ufos["radial_artefact"]=ufos["angle"].apply(lambda row: angle_in_artefacts(row, artefact_horizons))
+    #ensure distinction between raidal artefacts and below horizon
+    ufos.loc[ufos["above_horizon"]==False,["radial_artefact"]]=False
     ufos=ufos[ufos["area"]>=5]
     ufos=ufos[ufos["area"]<=600]
     ufos=ufos[ufos["axis_major_length"]/ufos["axis_minor_length"]<=5]
     ufos=ufos[ufos["axis_major_length"]>0]
     ufos=ufos[ufos["axis_minor_length"]>0]
     ufos=ufos[ufos["above_horizon"]==True]
+    ufos=ufos[ufos["radial_artefact"]==False]
     
     print("7: ufos filtered   "+(str(time.time()-start_time)))
     
