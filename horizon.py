@@ -65,12 +65,6 @@ def bresenham_line(x0, y0, x1, y1):
 
     return np.array(points)
 
-def point_in_circle(x1,y1,x_centre,y_centre,radius,warp):
-    dx = abs(x_centre - x1)
-    dy = abs(y_centre - y1)
-    d = math.sqrt(dx**2+(dy/warp)**2)
-    return(d<radius)
-
 def pixels_on_line(image, line):
     line_pixels = bresenham_line(*line)
     intersection_pixels = []
@@ -99,6 +93,15 @@ def is_point_above_horizon(point, x_centre, y_centre, horizon_r, horizon_l):
     
     return y > line_value
 
+def angle_of_point(point, x_centre, y_centre):
+    x, y = point
+    # Calculate the angle in radians using atan2
+    angle_rad = math.atan2(y - y_centre, x - x_centre)
+    # Convert the angle to degrees and shift it so that 0 degrees is north
+    angle_deg = (math.degrees(angle_rad)-90) % 360
+    
+    return angle_deg
+
 # Example usage:
 horizon_r = 82 # Replace with the angle of your line
 horizon_l = 274.5
@@ -124,12 +127,12 @@ files=sorted(jpg_files)
 #file=files[1]
 #file=files[6]
 #egFile=31
-egFile=0
-files=files[15:17]
+egFile=16
+#files=files[15:17]
 
 print("1: initial setup:   "+(str(time.time()-start_time)))
 
-for file in files[:]:
+for file in files[:17]:
 
     print(file)
     
@@ -225,31 +228,6 @@ for file in files[:]:
     #adj_horizon_r=70
     #adj_horizon_l=290
     
-    r_line=line_ends_from_angle(x_centre, y_centre, radius, adj_horizon_r,warp)
-    r_pixels=pixels_on_line(image_masked, r_line)
-    l_line=line_ends_from_angle(x_centre, y_centre, radius, adj_horizon_l,warp)
-    l_pixels=pixels_on_line(image_masked, l_line)
-    above_pixels=[]
-    
-    for pixel in l_pixels+r_pixels:
-        x, y = pixel
-        y1=0
-        while y1<=y:
-            if point_in_circle(x,y1,x_centre,y_centre,radius,warp):
-                above_pixels.append((x, y1))
-            y1+=1
-    
-    # Convert the list of coordinates to a NumPy array for indexing
-    coordinates_array = np.array(above_pixels)
-    
-    # Extract x and y coordinates separately
-    x_coords, y_coords = coordinates_array[:, 0], coordinates_array[:, 1]
-    
-    horizon_mask=np.zeros_like(image)
-    horizon_mask[y_coords, x_coords] = [255]
-    
-    print("4: horizon mask generated   "+(str(time.time()-start_time)))
-    
     circle_mask = np.zeros_like(image)
     # cv2.circle(circle_mask, (x_centre, y_centre), radius, (255, 255, 255), thickness=-1)
     cv2.ellipse(circle_mask, (x_centre, y_centre), (radius,radius2), 0, 0, 360, (255, 255, 255), thickness=-1)
@@ -257,11 +235,13 @@ for file in files[:]:
     image_masked=np.copy(image)
     image_masked[circle_mask[:,:,0]==0,:]=0
     
+    print("4: circle mask generated   "+(str(time.time()-start_time)))
+    
     horizon_mask=np.zeros_like(image)
     #-90 to the start angle as the function thinks 0 is east. +270 to the second angle to add 360 while accounting for the east problem. Second angle must be larger than the first as drawing is always clockwise.
     cv2.ellipse(horizon_mask, (x_centre, y_centre), (radius,radius2), 0, adj_horizon_l-90, adj_horizon_r+270, (255, 255, 255), thickness=-1)
     
-    print("5: circle mask generated   "+(str(time.time()-start_time)))
+    print("5: horizon mask generated   "+(str(time.time()-start_time)))
     
     #important - we remove the areas outside the from the hue mask, but not the areas below the horizon
     h_th[circle_mask[:,:,0]==0,]=0
@@ -306,13 +286,15 @@ for file in files[:]:
     # Example usage:
     angle_of_line = 30  # Replace with the angle of your line
     point_to_check = (3, 5)  # Replace with the coordinates of your point
-    ufos['above_line'] = ufos[["centroid-1","centroid-0"]].apply(lambda row: is_point_above_horizon(row, x_centre, y_centre,adj_horizon_r,adj_horizon_l), axis=1)
+    #below an alternative way to calculate whether ufos are above horizon, but horizon mask is now so fast that it's not needed
+    #ufos['above_line'] = ufos[["centroid-1","centroid-0"]].apply(lambda row: is_point_above_horizon(row, x_centre, y_centre,adj_horizon_r,adj_horizon_l), axis=1)
+    ufos['angle'] = ufos[["centroid-1","centroid-0"]].apply(lambda row: angle_of_point(row, x_centre, y_centre), axis=1)
     ufos=ufos[ufos["area"]>=5]
     ufos=ufos[ufos["area"]<=600]
     ufos=ufos[ufos["axis_major_length"]/ufos["axis_minor_length"]<=5]
     ufos=ufos[ufos["axis_major_length"]>0]
     ufos=ufos[ufos["axis_minor_length"]>0]
-    #ufos=ufos[ufos["above_horizon"]==True]
+    ufos=ufos[ufos["above_horizon"]==True]
     
     print("7: ufos filtered   "+(str(time.time()-start_time)))
     
