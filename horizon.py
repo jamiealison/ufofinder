@@ -18,10 +18,10 @@ min_s=60
 target_h=30
 interval=5
 
-draw=True
+draw=False
 
-#folder="2023 08 10-16"
-folder="Radar Grabs 2023 10 07 - 11"
+folder="2023 08 10-16"
+#folder="Radar Grabs 2023 10 07 - 11"
 indir="O:/Tech_ECOS-OWF-Screening/Fugle-flagermus-havpattedyr/BIRDS/Ship_BasedSurveys/VerticalRadar/ScreenDumps/"+folder+"/"
 outdir="O:/Tech_ECOS-OWF-Screening/Fugle-flagermus-havpattedyr/BIRDS/Ship_BasedSurveys/VerticalRadar/Predictions/"+folder+"/"
 
@@ -124,7 +124,7 @@ files=sorted(jpg_files)
 #file=files[1]
 #file=files[6]
 #egFile=31
-egFile=1
+egFile=0
 files=files[15:17]
 
 print("1: initial setup:   "+(str(time.time()-start_time)))
@@ -222,8 +222,8 @@ for file in files[:]:
     
     adj_horizon_r=horizon_r_clean
     adj_horizon_l=horizon_l_clean
-    # adj_horizon_r=70
-    # adj_horizon_l=290
+    #adj_horizon_r=70
+    #adj_horizon_l=290
     
     r_line=line_ends_from_angle(x_centre, y_centre, radius, adj_horizon_r,warp)
     r_pixels=pixels_on_line(image_masked, r_line)
@@ -256,7 +256,10 @@ for file in files[:]:
     
     image_masked=np.copy(image)
     image_masked[circle_mask[:,:,0]==0,:]=0
-    image_masked[circle_mask[:,:,0]==0,:]=0
+    
+    horizon_mask=np.zeros_like(image)
+    #-90 to the start angle as the function thinks 0 is east. +270 to the second angle to add 360 while accounting for the east problem. Second angle must be larger than the first as drawing is always clockwise.
+    cv2.ellipse(horizon_mask, (x_centre, y_centre), (radius,radius2), 0, adj_horizon_l-90, adj_horizon_r+270, (255, 255, 255), thickness=-1)
     
     print("5: circle mask generated   "+(str(time.time()-start_time)))
     
