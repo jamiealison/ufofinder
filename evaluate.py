@@ -9,19 +9,16 @@ import numpy as np, miniball, math, cv2, scipy.ndimage,scipy.spatial, os, statis
 
 #folder="2023 08 10-16"
 folder="Radar Grabs 2023 10 07 - 11"
+
 indir="O:/Tech_ECOS-OWF-Screening/Fugle-flagermus-havpattedyr/BIRDS/Ship_BasedSurveys/VerticalRadar/ScreenDumps/"+folder+"/"
 outdir="O:/Tech_ECOS-OWF-Screening/Fugle-flagermus-havpattedyr/BIRDS/Ship_BasedSurveys/VerticalRadar/Predictions/"+folder+"/"
 
-
 pred=pd.read_csv(outdir+"detected_ufos.csv")
-print(pred)
 
 obs=pd.read_csv(r"O:\Tech_ECOS-OWF-Screening\Fugle-flagermus-havpattedyr\BIRDS\Ship_BasedSurveys\VerticalRadar\Annotations\RDN\project_20231007_final.csv")
 #obs = obs.drop('name', axis=1)
 
-print(obs["region_shape_attributes"])
-obs = obs[obs["region_shape_attributes"] != "{}"]
-print(obs.columns)
+obs = obs.loc[obs["region_shape_attributes"] != "{}"]
 
 #below is to unserialize the dictionary column
 obs["region_shape_attributes"]=obs["region_shape_attributes"].apply(json.loads)
@@ -33,7 +30,6 @@ attr=pd.json_normalize(obs["region_shape_attributes"].tolist())
 attr.reset_index(drop=True, inplace=True)
 obs.reset_index(drop=True, inplace=True)
 print(attr.columns)
-print(attr)
 
 # List all files in the directory ending with ".jpg"
 jpg_files = [f for f in os.listdir(indir) if f.lower().endswith(".jpg")]
@@ -46,8 +42,8 @@ obs = pd.concat([obs, attr], axis=1)
 
 for file in files[:101]:
 
-    this_pred=pred[pred["file"]==file]
-    this_obs=obs[obs["filename"]==file]
+    this_pred=pred.loc[pred["file"]==file].copy()
+    this_obs=obs.loc[obs["filename"]==file].copy()
     
     #WARNING
     #currently skipping files where either dframe is empty for convenience
@@ -57,13 +53,8 @@ for file in files[:101]:
     # # Drop the original 'Details' column if needed
     # obs = obs.drop('region_shape_attributes', axis=1)
     
-    print(this_obs)
-    
     o_xy=list(zip(this_obs["cx"],this_obs["cy"]))
     p_xy=list(zip(this_pred["centroid-1"],this_pred["centroid-0"]))
-    
-    print(o_xy)
-    print(p_xy)
     
     print(file)
     # Build KD trees for both sets of points
@@ -73,8 +64,8 @@ for file in files[:101]:
     # Query nearest neighbors for each point in this_obs
     distances, indices = kdtree_set2.query(o_xy)
     
-    this_obs["match_id"]=indices
-    this_obs["match_dist"]=distances
+    this_obs.loc[:,"match_id"]=indices
+    this_obs.loc[:,"match_dist"]=distances
     this_obs=this_obs.sort_values(by="match_dist",ascending=True)
     this_obs["match"]=this_obs["match_dist"]<15
     this_obs.loc[this_obs.duplicated(subset=[x for x in this_obs.columns if x != "region_shape_attributes"]),"match"]=False
@@ -82,8 +73,8 @@ for file in files[:101]:
     # Query nearest neighbors for each point in this_pred
     distances, indices = kdtree_set1.query(p_xy)
     
-    this_pred["match_id"]=indices
-    this_pred["match_dist"]=distances
+    this_pred.loc[:,"match_id"]=indices
+    this_pred.loc[:,"match_dist"]=distances
     this_pred=this_pred.sort_values(by="match_dist",ascending=True)
     this_pred["match"]=this_pred["match_dist"]<15
     this_pred.loc[this_pred.duplicated(),"match"]=False
