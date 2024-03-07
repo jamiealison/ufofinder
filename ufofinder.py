@@ -9,6 +9,7 @@ import numpy as np, math, cv2, os, skimage.measure,pandas as pd,time,scipy.spati
 
 def predict(pars,folder,x_centre,y_centre,radius,warp,lim=101,draw=False,egFile=0):
     
+    print("Training {}".format(pars))
     hue,hi,mis,mia,maa,mid,lwr,hst,rst,hbf=pars
     indir="O:/Tech_ECOS-OWF-Screening/Fugle-flagermus-havpattedyr/BIRDS/Ship_BasedSurveys/VerticalRadar/ScreenDumps/"+folder+"/"
     outdir="O:/Tech_ECOS-OWF-Screening/Fugle-flagermus-havpattedyr/BIRDS/Ship_BasedSurveys/VerticalRadar/Predictions/"+folder+"/"
@@ -103,8 +104,8 @@ def predict(pars,folder,x_centre,y_centre,radius,warp,lim=101,draw=False,egFile=
         
         horizon_r = angles[0:360][np.argmax(yellownesses[0:360])]
         horizon_l = angles[360:720][np.argmax(yellownesses[360:720])]
-        print(horizon_r)
-        print(horizon_l)
+        #print(horizon_r)
+        #print(horizon_l)
         
         yellownesses=np.array(yellownesses).astype(int)
         #print(yellownesses)
@@ -116,8 +117,8 @@ def predict(pars,folder,x_centre,y_centre,radius,warp,lim=101,draw=False,egFile=
         
         horizon_r_clean=angles[np.where(yellownesses>hst)[0][0] if np.any(yellownesses>hst) else None]-hbf/2
         horizon_l_clean=angles[np.where(yellownesses>hst)[0][-1] if np.any(yellownesses>hst) else None]+hbf/2
-        print(horizon_r_clean)
-        print(horizon_l_clean)
+        #print(horizon_r_clean)
+        #print(horizon_l_clean)
         #here we use an artificial horizon to extract bad weather conditions
         
         adj_horizon_r=horizon_r_clean
@@ -230,14 +231,14 @@ def evaluate(folder,lim=101,egFile=0):
     
     #below is to unserialize the dictionary column
     obs["region_shape_attributes"]=obs["region_shape_attributes"].apply(json.loads)
-    print(obs.columns)
+    #print(obs.columns)
     
     attr=pd.json_normalize(obs["region_shape_attributes"].tolist())
     #need to reset the index to ensure they link properly. Watch out in case there 
     #are missing data in some region_attributes column entries...
     attr.reset_index(drop=True, inplace=True)
     obs.reset_index(drop=True, inplace=True)
-    print(attr.columns)
+    #print(attr.columns)
     
     # List all files in the directory ending with ".jpg"
     jpg_files = [f for f in os.listdir(indir) if f.lower().endswith(".jpg")]
@@ -319,11 +320,11 @@ def evaluate(folder,lim=101,egFile=0):
     tp=sum(all_pred["match"])
     fp=sum(np.logical_not(all_pred["match"]))
     fn=sum(np.logical_not(all_obs["match"]))
-    print(tp,fp,fn)
     
     pre=tp/(tp+fp)
     rec=tp/(tp+fn)
     f1=2*(pre*rec)/(pre+rec)
+    print(tp,fp,fn,pre,rec,f1)
     return(pre,rec,f1)
 
 def train(pars,folder,x_centre,y_centre,radius,warp,lim=101,draw=False,egFile=0):
