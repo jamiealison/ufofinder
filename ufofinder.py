@@ -7,24 +7,7 @@ Created on Tue Jan  9 16:27:34 2024
 
 import numpy as np, math, cv2, os, skimage.measure,pandas as pd,time,scipy.spatial, json
 
-#folder="2023 08 10-16"
-folder="Radar Grabs 2023 10 07 - 11"
-x_centre=990
-y_centre=950
-radius=929
-warp=0.989724175229854
-hst=20
-rst=20
-hbf=2
-mis=60
-mia=5
-maa=600
-mid=50
-lwr=5
-hue=30
-hi=5
-
-def predict_ufos(folder,hue,hi,mis,mia,maa,mid,lwr,hst,hbf,x_centre,y_centre,radius,warp,lim=101,draw=False,egFile=0):
+def predict(folder,hue,hi,mis,mia,maa,mid,lwr,hst,rst,hbf,x_centre,y_centre,radius,warp,lim=101,draw=False,egFile=0):
 
     indir="O:/Tech_ECOS-OWF-Screening/Fugle-flagermus-havpattedyr/BIRDS/Ship_BasedSurveys/VerticalRadar/ScreenDumps/"+folder+"/"
     outdir="O:/Tech_ECOS-OWF-Screening/Fugle-flagermus-havpattedyr/BIRDS/Ship_BasedSurveys/VerticalRadar/Predictions/"+folder+"/"
@@ -128,7 +111,7 @@ def predict_ufos(folder,hue,hi,mis,mia,maa,mid,lwr,hst,hbf,x_centre,y_centre,rad
         horizons = pd.DataFrame({'angle': angles, 'strength': yellownesses})
         artefact_horizons=horizons.loc[horizons['strength']>rst,['angle']]
         artefact_horizons=artefact_horizons['angle'].tolist()
-        print(artefact_horizons)
+        #print(artefact_horizons)
         
         horizon_r_clean=angles[np.where(yellownesses>hst)[0][0] if np.any(yellownesses>hst) else None]-hbf
         horizon_l_clean=angles[np.where(yellownesses>hst)[0][-1] if np.any(yellownesses>hst) else None]+hbf
@@ -231,89 +214,6 @@ def predict_ufos(folder,hue,hi,mis,mia,maa,mid,lwr,hst,hbf,x_centre,y_centre,rad
     all_ufos.to_csv(outdir+'detected_ufos.csv', index=False) 
     
     print("9: ufos written to csv   "+(str(time.time()-start_time)))
-
-def line_ends_from_angle(x_centre, y_centre, radius, angle,warp):
-    
-    # Convert bearing from degrees to radians
-    bearing_rad = math.radians(angle)
-
-    # #change + to minus for both x and y because in images the positive y coordinate runs "south" so to speak
-    
-    # Calculate new latitude
-    y_new = y_centre - (radius * math.cos(bearing_rad))*warp
-
-    # Calculate new longitude
-    x_new = x_centre + radius * math.sin(bearing_rad)
-
-    return x_centre, y_centre, np.round(x_new).astype(int), np.round(y_new).astype(int)
-
-#below is from chatgpt. I have tested it and it appears to work quite perfectly
-def bresenham_line(x0, y0, x1, y1):
-    points = []
-    dx = abs(x1 - x0)
-    dy = abs(y1 - y0)
-    sx = 1 if x0 < x1 else -1
-    sy = 1 if y0 < y1 else -1
-    err = dx - dy
-
-    while True:
-        points.append((x0, y0))
-
-        if x0 == x1 and y0 == y1:
-            break
-
-        e2 = 2 * err
-        if e2 > -dy:
-            err -= dy
-            x0 += sx
-        if e2 < dx:
-            err += dx
-            y0 += sy
-
-    return np.array(points)
-
-def pixels_on_line(image, line):
-    line_pixels = bresenham_line(*line)
-    intersection_pixels = []
-
-    for pixel in line_pixels:
-        x, y = pixel
-        if 0 <= x < image.shape[1] and 0 <= y < image.shape[0]:
-            intersection_pixels.append((x, y))
-
-    return intersection_pixels
-
-def is_point_above_horizon(point, x_centre, y_centre, horizon_r, horizon_l):
-    x, y = point
-    x-=x_centre
-    y=y_centre-y
-    #note added reciprocal to math.tan to account for 0 being up
-    if x<0:
-        angle=horizon_l
-        #taking the negative of the slope on the left side
-        slope = -1/math.tan(math.radians(angle))  # Convert angle to radians and calculate slope
-    else:
-        angle=horizon_r
-        slope = 1/math.tan(math.radians(angle))  # Convert angle to radians and calculate slope
-        
-    line_value = slope * abs(x)
-    
-    return y > line_value
-
-def angle_of_point(point, x_centre, y_centre):
-    x, y = point
-    # Calculate the angle in radians using atan2
-    angle_rad = math.atan2(y_centre-y, x_centre-x)
-    # Convert the angle to degrees and shift it so that 0 degrees is north
-    angle_deg = (math.degrees(angle_rad)-90) % 360
-    
-    return angle_deg
-
-def angle_in_artefacts(angle,artefacts):
-    diffs=[angle - artefact for artefact in artefacts]
-    abs_diffs=[abs(x) for x in diffs]
-    small_diffs=[x<0.5 for x in abs_diffs]
-    return any(small_diffs)
 
 def evaluate(folder,lim=101,egFile=0):
 
@@ -424,6 +324,91 @@ def evaluate(folder,lim=101,egFile=0):
     rec=tp/(tp+fn)
     f1=2*(pre*rec)/(pre+rec)
     return(pre,rec,f1)
+
+def train(folder,hue,hi,mis,mia,maa,mid,lwr,hst,rst,hbf,x_centre,y_centre,radius,warp,lim=101,draw=False,egFile=0):
     
-predict_ufos(folder,hue,hi,mis,mia,maa,mid,lwr,hst,hbf,x_centre,y_centre,radius,warp,draw=False,lim=1)
-evaluate(folder,lim=1)
+    predict(folder,hue,hi,mis,mia,maa,mid,lwr,hst,rst,hbf,x_centre,y_centre,radius,warp,draw=False,lim=lim)
+    return(evaluate(folder,lim=lim)[2])
+
+def line_ends_from_angle(x_centre, y_centre, radius, angle,warp):
+    
+    # Convert bearing from degrees to radians
+    bearing_rad = math.radians(angle)
+
+    # #change + to minus for both x and y because in images the positive y coordinate runs "south" so to speak
+    
+    # Calculate new latitude
+    y_new = y_centre - (radius * math.cos(bearing_rad))*warp
+
+    # Calculate new longitude
+    x_new = x_centre + radius * math.sin(bearing_rad)
+
+    return x_centre, y_centre, np.round(x_new).astype(int), np.round(y_new).astype(int)
+
+#below is from chatgpt. I have tested it and it appears to work quite perfectly
+def bresenham_line(x0, y0, x1, y1):
+    points = []
+    dx = abs(x1 - x0)
+    dy = abs(y1 - y0)
+    sx = 1 if x0 < x1 else -1
+    sy = 1 if y0 < y1 else -1
+    err = dx - dy
+
+    while True:
+        points.append((x0, y0))
+
+        if x0 == x1 and y0 == y1:
+            break
+
+        e2 = 2 * err
+        if e2 > -dy:
+            err -= dy
+            x0 += sx
+        if e2 < dx:
+            err += dx
+            y0 += sy
+
+    return np.array(points)
+
+def pixels_on_line(image, line):
+    line_pixels = bresenham_line(*line)
+    intersection_pixels = []
+
+    for pixel in line_pixels:
+        x, y = pixel
+        if 0 <= x < image.shape[1] and 0 <= y < image.shape[0]:
+            intersection_pixels.append((x, y))
+
+    return intersection_pixels
+
+def is_point_above_horizon(point, x_centre, y_centre, horizon_r, horizon_l):
+    x, y = point
+    x-=x_centre
+    y=y_centre-y
+    #note added reciprocal to math.tan to account for 0 being up
+    if x<0:
+        angle=horizon_l
+        #taking the negative of the slope on the left side
+        slope = -1/math.tan(math.radians(angle))  # Convert angle to radians and calculate slope
+    else:
+        angle=horizon_r
+        slope = 1/math.tan(math.radians(angle))  # Convert angle to radians and calculate slope
+        
+    line_value = slope * abs(x)
+    
+    return y > line_value
+
+def angle_of_point(point, x_centre, y_centre):
+    x, y = point
+    # Calculate the angle in radians using atan2
+    angle_rad = math.atan2(y_centre-y, x_centre-x)
+    # Convert the angle to degrees and shift it so that 0 degrees is north
+    angle_deg = (math.degrees(angle_rad)-90) % 360
+    
+    return angle_deg
+
+def angle_in_artefacts(angle,artefacts):
+    diffs=[angle - artefact for artefact in artefacts]
+    abs_diffs=[abs(x) for x in diffs]
+    small_diffs=[x<0.5 for x in abs_diffs]
+    return any(small_diffs)
