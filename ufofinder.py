@@ -7,8 +7,9 @@ Created on Tue Jan  9 16:27:34 2024
 
 import numpy as np, math, cv2, os, skimage.measure,pandas as pd,time,scipy.spatial, json
 
-def predict(folder,hue,hi,mis,mia,maa,mid,lwr,hst,rst,hbf,x_centre,y_centre,radius,warp,lim=101,draw=False,egFile=0):
-
+def predict(pars,folder,x_centre,y_centre,radius,warp,lim=101,draw=False,egFile=0):
+    
+    hue,hi,mis,mia,maa,mid,lwr,hst,rst,hbf=pars
     indir="O:/Tech_ECOS-OWF-Screening/Fugle-flagermus-havpattedyr/BIRDS/Ship_BasedSurveys/VerticalRadar/ScreenDumps/"+folder+"/"
     outdir="O:/Tech_ECOS-OWF-Screening/Fugle-flagermus-havpattedyr/BIRDS/Ship_BasedSurveys/VerticalRadar/Predictions/"+folder+"/"
     #set ellipse radius
@@ -113,8 +114,8 @@ def predict(folder,hue,hi,mis,mia,maa,mid,lwr,hst,rst,hbf,x_centre,y_centre,radi
         artefact_horizons=artefact_horizons['angle'].tolist()
         #print(artefact_horizons)
         
-        horizon_r_clean=angles[np.where(yellownesses>hst)[0][0] if np.any(yellownesses>hst) else None]-hbf
-        horizon_l_clean=angles[np.where(yellownesses>hst)[0][-1] if np.any(yellownesses>hst) else None]+hbf
+        horizon_r_clean=angles[np.where(yellownesses>hst)[0][0] if np.any(yellownesses>hst) else None]-hbf/2
+        horizon_l_clean=angles[np.where(yellownesses>hst)[0][-1] if np.any(yellownesses>hst) else None]+hbf/2
         print(horizon_r_clean)
         print(horizon_l_clean)
         #here we use an artificial horizon to extract bad weather conditions
@@ -325,9 +326,9 @@ def evaluate(folder,lim=101,egFile=0):
     f1=2*(pre*rec)/(pre+rec)
     return(pre,rec,f1)
 
-def train(folder,hue,hi,mis,mia,maa,mid,lwr,hst,rst,hbf,x_centre,y_centre,radius,warp,lim=101,draw=False,egFile=0):
+def train(pars,folder,x_centre,y_centre,radius,warp,lim=101,draw=False,egFile=0):
     
-    predict(folder,hue,hi,mis,mia,maa,mid,lwr,hst,rst,hbf,x_centre,y_centre,radius,warp,draw=False,lim=lim)
+    predict(pars,folder,x_centre,y_centre,radius,warp,lim,draw,egFile)
     return(evaluate(folder,lim=lim)[2])
 
 def line_ends_from_angle(x_centre, y_centre, radius, angle,warp):
