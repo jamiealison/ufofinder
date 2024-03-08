@@ -25,7 +25,7 @@ hue=30
 hi=5
 
 par_minmaxstep=[
-    [15,34,1],
+    [25,34,1],
     [0,9,1],
     [0,100,10],
     [0,9,1],
@@ -37,7 +37,7 @@ par_minmaxstep=[
     [0,9,1]
     ]
 
-lim=1
+lim=101
 draw=False
 egFile=999
 
@@ -76,8 +76,8 @@ def hill_climbing(initial_solution, num_iterations):
             current_value = best_value
             improved_pars.update({current_solution:current_value})
             print("New best solution F1 {}: {}".format(current_value,current_solution))
-        else:
-            break  # Terminate if there are no better neighbors
+        # else:
+        #     break  # Terminate if there are no better neighbors
 
     return improved_pars,tried_pars
 

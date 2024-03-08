@@ -71,7 +71,7 @@ def predict(pars,folder,x_centre,y_centre,radius,warp,lim=101,draw=False,egFile=
         #angles=[90]
         angles=[x / 2.0 for x in range(0, 720)]
         
-        print("2: image loaded and colorspace coverted   "+(str(time.time()-start_time)))
+        print("2: image loaded and colorspace converted   "+(str(time.time()-start_time)))
         
         for angle in angles:
         
