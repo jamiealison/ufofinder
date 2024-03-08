@@ -24,20 +24,20 @@ lwr=5
 hue=30
 hi=5
 
-par_minmax=[
-    [25,34],
-    [0,9],
-    [0,100],
-    [0,9],
-    [300,600],
-    [50,100],
-    [0,9],
-    [10,30],
-    [0,30],
-    [0,9]
+par_minmaxstep=[
+    [15,34,1],
+    [0,9,1],
+    [0,100,10],
+    [0,9,1],
+    [400,600,20],
+    [50,100,5],
+    [0,9,1],
+    [10,30,2],
+    [0,30,2],
+    [0,9,1]
     ]
 
-lim=101
+lim=1
 draw=False
 egFile=999
 
@@ -49,11 +49,11 @@ def hill_climbing(initial_solution, num_iterations):
     current_solution = tuple(initial_solution)
     current_value = ufofinder.train(current_solution,folder,x_centre,y_centre,radius,warp,lim,draw=False,egFile=0)
 
-    tried_pars = set()
-    tried_pars.add(current_solution)
+    tried_pars = {}
+    tried_pars.update({current_solution:current_value})
     
-    improved_pars = set()
-    improved_pars.add(current_solution)
+    improved_pars = {}
+    improved_pars.update({current_solution:current_value})
     
     for idx in range(num_iterations*num_params):
         par_idx = idx % num_params
@@ -64,7 +64,7 @@ def hill_climbing(initial_solution, num_iterations):
         if len(neighbors) == 0:
             break
         neighbors_values = [ufofinder.train(neighbor,folder,x_centre,y_centre,radius,warp,lim,draw=False,egFile=0) for neighbor in neighbors]
-        [tried_pars.add(n) for n in neighbors]
+        [tried_pars.update({n:val}) for n,val in zip(neighbors,neighbors_values)]
         
         # Select the neighbor with the highest objective function value
         best_neighbor = neighbors[np.argmax(neighbors_values)]
@@ -74,25 +74,22 @@ def hill_climbing(initial_solution, num_iterations):
         if best_value > current_value:
             current_solution = best_neighbor
             current_value = best_value
-            improved_pars.add(best_neighbor)
+            improved_pars.update({current_solution:current_value})
             print("New best solution F1 {}: {}".format(current_value,current_solution))
         else:
             break  # Terminate if there are no better neighbors
 
-    return improved_pars
+    return improved_pars,tried_pars
 
-def generate_line(solution, idx, linewidth=4):
-    smin, smax = par_minmax[idx]
-    current = solution[idx]
-    smin = max(current-linewidth,smin)
-    smax = min(current+linewidth,smax)
+def generate_line(solution, idx):
+    smin, smax, step = par_minmaxstep[idx]
     line_members = []
-    for v in range(smin, smax+1):
+    for v in range(smin, smax+1,step):
         member = list(solution)
         member[idx] = v
         line_members.extend([tuple(member)])
     return line_members
-print(generate_line(pars, 0, 1))
+print(generate_line(pars, 0))
 
 def generate_neighbors(solution):
     # Implement logic to generate neighboring solutions based on the current solution
@@ -107,6 +104,8 @@ def generate_neighbors(solution):
     return neighbors
 #print(generate_neighbors(pars))
 
-print(hill_climbing(pars, 5))
+improved_pars,tried_pars=hill_climbing(pars, 5)
+print(tried_pars)
+print(improved_pars)
 #print(ufofinder.train(pars,folder,x_centre,y_centre,radius,warp,lim=2,draw=False,egFile=0))
 #print(minimize(ufofinder.train, pars, args=(folder,x_centre,y_centre,radius,warp,lim,draw,egFile), method='Nelder-Mead', jac=None, hess=None, hessp=None, bounds=None, constraints=(), tol=None, callback=None, options={'maxiter': 2}))

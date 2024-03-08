@@ -115,8 +115,8 @@ def predict(pars,folder,x_centre,y_centre,radius,warp,lim=101,draw=False,egFile=
         artefact_horizons=artefact_horizons['angle'].tolist()
         #print(artefact_horizons)
         
-        horizon_r_clean=angles[np.where(yellownesses>hst)[0][0] if np.any(yellownesses>hst) else None]-hbf/2
-        horizon_l_clean=angles[np.where(yellownesses>hst)[0][-1] if np.any(yellownesses>hst) else None]+hbf/2
+        horizon_r_clean=angles[np.where(yellownesses>hst)[0][0]]-hbf/2 if np.any(yellownesses>hst) else 135
+        horizon_l_clean=angles[np.where(yellownesses>hst)[0][-1]]+hbf/2 if np.any(yellownesses>hst) else 225
         #print(horizon_r_clean)
         #print(horizon_l_clean)
         #here we use an artificial horizon to extract bad weather conditions
@@ -314,16 +314,34 @@ def evaluate(folder,lim=101,egFile=0):
                 
             cv2.imwrite(outdir+"ufos_detected.png", image)
     
-    all_obs.to_csv(outdir+"observed_ufos_eval.csv")
-    all_pred.to_csv(outdir+"detected_ufos_eval.csv")
+    if 'all_pred' not in locals():
+        tp=0
+        fp=0
+    else:
+        tp=sum(all_pred["match"])
+        fp=sum(np.logical_not(all_pred["match"]))
+        all_pred.to_csv(outdir+"detected_ufos_eval.csv")
     
-    tp=sum(all_pred["match"])
-    fp=sum(np.logical_not(all_pred["match"]))
-    fn=sum(np.logical_not(all_obs["match"]))
+    if 'all_obs' not in locals():
+        fn=0
+    else:
+        fn=sum(np.logical_not(all_obs["match"]))
+        all_obs.to_csv(outdir+"observed_ufos_eval.csv")
     
-    pre=tp/(tp+fp)
-    rec=tp/(tp+fn)
-    f1=2*(pre*rec)/(pre+rec)
+    try:
+        pre=tp/(tp+fp)
+    except ZeroDivisionError:
+        pre=0
+        f1=0
+    try:
+        rec=tp/(tp+fn)
+    except ZeroDivisionError:
+        rec=0
+        f1=0
+    try:
+        f1=2*(pre*rec)/(pre+rec)
+    except ZeroDivisionError:
+        f1=0
     print(tp,fp,fn,pre,rec,f1)
     return(pre,rec,f1)
 
