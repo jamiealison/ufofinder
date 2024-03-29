@@ -9,7 +9,7 @@ import numpy as np, math, cv2, os, skimage.measure,pandas as pd,time,scipy.spati
 
 def predict(pars,folder,x_centre,y_centre,radius,warp,lim=101,draw=False,egFile=0):
     
-    print("Training {}".format(pars))
+    print("Predicting {}".format(pars))
     hue,hi,mis,mia,maa,mid,lwr,hst,rst,hbf=pars
     indir="O:/Tech_ECOS-OWF-Screening/Fugle-flagermus-havpattedyr/BIRDS/Ship_BasedSurveys/VerticalRadar/ScreenDumps/"+folder+"/"
     outdir="O:/Tech_ECOS-OWF-Screening/Fugle-flagermus-havpattedyr/BIRDS/Ship_BasedSurveys/VerticalRadar/Predictions/"+folder+"/"
@@ -41,6 +41,7 @@ def predict(pars,folder,x_centre,y_centre,radius,warp,lim=101,draw=False,egFile=
         image_masked = np.copy(image)
         image_angles = np.copy(image)
         
+        r=image_masked[:,:,2]
         
         # Convert the image from BGR to HSV color space
         hls_image = cv2.cvtColor(image_masked, cv2.COLOR_BGR2HLS)
@@ -119,7 +120,6 @@ def predict(pars,folder,x_centre,y_centre,radius,warp,lim=101,draw=False,egFile=
         horizon_l_clean=angles[np.where(yellownesses>hst)[0][-1]]+hbf/2 if np.any(yellownesses>hst) else 225
         #print(horizon_r_clean)
         #print(horizon_l_clean)
-        #here we use an artificial horizon to extract bad weather conditions
         
         adj_horizon_r=horizon_r_clean
         adj_horizon_l=horizon_l_clean
@@ -139,7 +139,19 @@ def predict(pars,folder,x_centre,y_centre,radius,warp,lim=101,draw=False,egFile=
         #-90 to the start angle as the function thinks 0 is east. +270 to the second angle to add 360 while accounting for the east problem. Second angle must be larger than the first as drawing is always clockwise.
         cv2.ellipse(horizon_mask, (x_centre, y_centre), (radius,radius2), 0, adj_horizon_l-90, adj_horizon_r+270, (255, 255, 255), thickness=-1)
         
-        print("5: horizon mask generated   "+(str(time.time()-start_time)))
+        #here we use an artificial horizon to quantify bad weather conditions
+        fake_horizon_r=70
+        fake_horizon_l=290
+        
+        horizon_mask_2 = np.zeros_like(image)
+        cv2.ellipse(horizon_mask_2, (x_centre, y_centre), (radius,radius2), 0, fake_horizon_l-90, fake_horizon_r+270, (255, 255, 255), thickness=-1)
+        
+        r[horizon_mask_2[:,:,0]==0]=0
+        weather=np.percentile(r[horizon_mask_2[:,:,0]!=0],95)
+        if file==files[egFile]:
+            cv2.imwrite(outdir+"an_output_image_weather.png", r)
+        
+        print("5: horizon masks generated   "+(str(time.time()-start_time)))
         
         #important - we remove the areas outside the from the hue mask, but not the areas below the horizon
         h_th[circle_mask[:,:,0]==0,]=0
@@ -157,7 +169,6 @@ def predict(pars,folder,x_centre,y_centre,radius,warp,lim=101,draw=False,egFile=
         #valid_r=np.percentile(image_masked[valid[:,0],valid[:,1],2], 95)
         #print(valid_r)
         
-    
         image_ufos,n_ufos=skimage.measure.label(h_th,return_num=True)
         print("6: UFOs detected before filtering: {},     {}".format(n_ufos,str(time.time()-start_time)))
         
@@ -193,6 +204,7 @@ def predict(pars,folder,x_centre,y_centre,radius,warp,lim=101,draw=False,egFile=
         ufos=ufos[ufos["axis_minor_length"]>0]
         ufos=ufos[ufos["above_horizon"]==True]
         ufos=ufos[ufos["radial_artefact"]==False]
+        ufos["weather_indicator"]=weather
         
         print("7: ufos filtered   "+(str(time.time()-start_time)))
         
