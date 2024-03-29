@@ -357,6 +357,83 @@ def evaluate(folder,lim=101,egFile=0):
     print(tp,fp,fn,pre,rec,f1)
     return(pre,rec,f1)
 
+def compare(file1,file2):
+
+    datasets = {"obs1": pd.read_csv(file1), "obs2": pd.read_csv(file2)}
+
+    for name, dataset in datasets.items():
+        obs = dataset.loc[dataset["region_shape_attributes"] != "{}"].copy()
+        obs["region_shape_attributes"]=obs["region_shape_attributes"].apply(json.loads)
+        attr=pd.json_normalize(obs["region_shape_attributes"].tolist())
+        #need to reset the index to ensure they link properly. Watch out in case there 
+        #are missing data in some region_attributes column entries...
+        attr.reset_index(drop=True, inplace=True)
+        obs.reset_index(drop=True, inplace=True)
+        #to get rid of 'r' for circle annotations
+        attr=attr[["name","cx","cy"]]
+        # print(attr.columns)
+        # Concatenate the original DataFrame with the normalized columns
+        obs = pd.concat([obs, attr], axis=1)
+        datasets[name] = obs
+
+    files=list(set(pd.concat([datasets["obs1"]["filename"],datasets["obs2"]["filename"]])))
+    print(len(files))
+    
+    matchs=[]
+    only1s=[]
+    only2s=[]
+    mismatch=0
+    
+    for file in files[:]:
+        
+        print(file)
+        matches = {"obs1": [], "obs2": []}
+        for name, dataset in datasets.items():
+            this_obs=dataset.loc[dataset["filename"]==file].copy()
+            other_item = {key: value for key, value in datasets.items() if not key == name}
+            other_dataset=next(iter(other_item.values()))
+            other_obs=other_dataset.loc[other_dataset["filename"]==file].copy()
+            if this_obs.empty:
+                matches[name]=[0,len(other_obs)]
+                continue
+            if other_obs.empty:
+                matches[name]=[0,len(this_obs)]
+                continue
+            xy1=list(zip(this_obs["cx"],this_obs["cy"]))
+            xy2=list(zip(other_obs["cx"],other_obs["cy"]))
+            kdtree2 = scipy.spatial.cKDTree(xy2)
+            distances, indices = kdtree2.query(xy1)
+            this_obs.loc[:,"match_id"]=indices
+            this_obs.loc[:,"match_dist"]=distances
+            this_obs["match"]=this_obs["match_dist"]<15
+            this_obs.loc[this_obs[["match","match_id"]].duplicated(),"match"]=False
+            # print(len(this_obs))
+            # print(this_obs[["match_id","match","match_dist"]].sort_values(by=["match_id"]))
+            matches[name]=[sum(this_obs["match"]),sum(this_obs["match"]==False)]
+        
+        print(matches)
+        if not matches["obs1"][0]==matches["obs2"][0]:
+            mismatch+=1
+            # raise ValueError("{}: Somehow different numbers of matching points between the two sets, needs debugging".format(file))
+
+        matchs.append(max(matches["obs1"][0],matches["obs2"][0]))
+        only1s.append(matches["obs1"][1])
+        only2s.append(matches["obs2"][1])
+
+    matchdf=pd.DataFrame({"file":files,"match":matchs,"only1":only1s,"only2":only2s})
+    if mismatch>0:
+        print("{} mismatch in the number of matches between obs tables. This can happen because second priorities for matches are not currently checked".format(mismatch))
+
+    return(matchdf)
+
+# file1=r"O:\Tech_ECOS-OWF-Screening\Fugle-flagermus-havpattedyr\BIRDS\Ship_BasedSurveys\VerticalRadar\Annotations\RDN\project_20231007_final.csv"
+# file2=r"O:\Tech_ECOS-OWF-Screening\Fugle-flagermus-havpattedyr\BIRDS\Ship_BasedSurveys\VerticalRadar\Annotations\TEO\071023 via_export_csv_teo.csv"
+
+# matchdf=compare(file1,file2)
+# print(sum(matchdf["match"]),sum(matchdf["only1"]),sum(matchdf["only2"]))
+# print(sum(matchdf["match"])/(sum(matchdf["match"])+sum(matchdf["only1"])))
+# print(sum(matchdf["match"])/(sum(matchdf["match"])+sum(matchdf["only2"])))
+
 def train(pars,folder,x_centre,y_centre,radius,warp,lim=101,draw=False,egFile=0):
     
     predict(pars,folder,x_centre,y_centre,radius,warp,lim,draw,egFile)
