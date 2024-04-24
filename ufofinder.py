@@ -29,6 +29,9 @@ def predict(pars,folder,x_centre,y_centre,radius,warp,lim=101,draw=False,egFile=
     
     print("1: initial setup:   "+(str(time.time()-start_time)))
     
+    if lim==0:
+        lim=len(files)
+    
     if len(files)<lim:
         raise ValueError("lim is higher then the number of jpgs in the directory")
     
@@ -116,8 +119,8 @@ def predict(pars,folder,x_centre,y_centre,radius,warp,lim=101,draw=False,egFile=
         artefact_horizons=artefact_horizons['angle'].tolist()
         #print(artefact_horizons)
         
-        horizon_r_clean=angles[np.where(yellownesses>hst)[0][0]]-hbf/2 if np.any(yellownesses>hst) else 135
-        horizon_l_clean=angles[np.where(yellownesses>hst)[0][-1]]+hbf/2 if np.any(yellownesses>hst) else 225
+        horizon_r_clean=angles[np.where(yellownesses>hst)[0][0]]-hbf/2 if np.any(yellownesses>hst) else 90
+        horizon_l_clean=angles[np.where(yellownesses>hst)[0][-1]]+hbf/2 if np.any(yellownesses>hst) else 270
         #print(horizon_r_clean)
         #print(horizon_l_clean)
         
